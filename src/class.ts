@@ -40,35 +40,42 @@ class Restaurant implements IRestaurant {
  */
 
  interface IFastFoodRestaurant extends IRestaurant {
-  driveThru: boolean;
+		driveThru: boolean;
 
-  should(): string | void;
-  hasDriveThru(): string;
-}
+		should(): string;
+		hasDriveThru(): string;
+ }
 
 class FastFoodRestaurant extends Restaurant implements IFastFoodRestaurant {
-  // The constructor of the FastFoodRestaurant class takes in the same parameters as the Restaurant class, 
-  // along with an additional parameter for driveThru. 
-  // It calls the super() method to initialize the properties of the Restaurant class, 
-  // and then sets the driveThru property based on the value passed in the constructor.
+	// The constructor of the FastFoodRestaurant class takes in the same parameters as the Restaurant class,
+	// along with an additional parameter for driveThru.
+	// It calls the super() method to initialize the properties of the Restaurant class,
+	// and then sets the driveThru property based on the value passed in the constructor.
 
-  // other method to imnplemen the constructed driveThru property
+	// other method to imnplemen the constructed driveThru property
 
-  constructor(Rname: string, Rcuisine: string, Rraiting: number, private driveService: boolean) {
-    super(Rname, Rcuisine, Rraiting);
-  }
+	constructor(
+		Rname: string,
+		Rcuisine: string,
+		Rraiting: number,
+		private driveService: boolean
+	) {
+		super(Rname, Rcuisine, Rraiting);
+	}
 
-  driveThru: boolean = this.driveService;
-  
-  hasDriveThru(): string {
-    return this.driveThru ? `${this.name} has a drive-thru service.` : `${this.name} does not have a drive-thru service.`;
-  }
+	driveThru: boolean = this.driveService;
 
-  should(): string | void {
-    return this.driveThru 
-      ? `You should visit ${this.name} for a quick meal!` 
-      : `You can visit ${this.name} for a dine-in experience.`;
-  }
+	hasDriveThru(): string {
+		return this.driveThru
+			? `${this.name} has a drive-thru service.`
+			: `${this.name} does not have a drive-thru service.`;
+	}
+
+	should(): string {
+		return this.driveThru
+			? `You should visit ${this.name} for a quick meal!`
+			: `You can visit ${this.name} for a dine-in experience.`;
+	}
 }
 
 const mcdonalds = new FastFoodRestaurant("McDonald's", "Fast Food", 4.5, true);
