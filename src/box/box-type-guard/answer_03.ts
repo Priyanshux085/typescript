@@ -67,35 +67,35 @@ export class StrictBox<T extends basic> extends Box<T> implements IStrictBox<T> 
   }
 }
 
-type ValidContent = 
-  | { type: 'user'; id: string; metadata: Record<string, unknown> }
-  | { type: 'product'; id: string; metadata: Record<string, unknown> }
-  | { type: 'order'; id: string; metadata: Record<string, unknown> };
+// type ValidContent = 
+//   | { type: 'user'; id: string; metadata: Record<string, unknown> }
+//   | { type: 'product'; id: string; metadata: Record<string, unknown> }
+//   | { type: 'order'; id: string; metadata: Record<string, unknown> };
 
-const validUserContent = {
-  type: 'user',
-  id: "user_123",
-  metadata: { name: "Alice", age: 25 }
-} satisfies ValidContent;
+// const validUserContent = {
+//   type: 'user',
+//   id: "user_123",
+//   metadata: { name: "Alice", age: 25 }
+// } satisfies ValidContent;
 
-const validProductContent = {
-  type: 'product',
-  id: "product_456",
-  metadata: { name: "Laptop", price: 999 }
-} satisfies ValidContent;
+// const validProductContent = {
+//   type: 'product',
+//   id: "product_456",
+//   metadata: { name: "Laptop", price: 999 }
+// } satisfies ValidContent;
 
-const validOrderContent = {
-  type: 'order',
-  id: "order_789",
-  metadata: { orderId: "order_789", total: 1999 }
-} satisfies ValidContent;
+// const validOrderContent = {
+//   type: 'order',
+//   id: "order_789",
+//   metadata: { orderId: "order_789", total: 1999 }
+// } satisfies ValidContent;
 
-const user = new StrictBox(validUserContent);
-const product = new StrictBox(validProductContent);
-const order = new StrictBox(validOrderContent);
+// const user = new StrictBox(validUserContent);
+// const product = new StrictBox(validProductContent);
+// const order = new StrictBox(validOrderContent);
 
-console.log("\n Validated Contents: \n", 
-  "User:", user.content,
-  "Product:", product.content,
-  "Order:", order.content
-);
+// console.log("\n Validated Contents: \n", 
+//   "User:", user.merge,
+//   "Product:", product.content,
+//   "Order:", order.content
+// );
