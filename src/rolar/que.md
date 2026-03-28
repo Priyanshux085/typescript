@@ -37,7 +37,7 @@ flowchart TD
   - ~~**Output**: `Result<T>` discriminated union.~~
   - ~~*Hint*: Use `ok: true | false` to drive narrowing.~~
 
-## Question 04: Implement `TenantPlan` type or enum.
+## ~~Question 04: Implement `TenantPlan` type or enum.~~
 
 ### Description: Represent plan tiers and their capabilities. The plan should include limits and features that affect fee and routing strategies.
 - **Input**: Plan key, limits, and features. Fields might include max transaction amount, allowed currencies, fee strategy type, and routing strategy type.
