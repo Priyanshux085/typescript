@@ -19,35 +19,36 @@ flowchart TD
 
 ## Stepwise Questions
 
-Question 01: Implement `Currency` enum and `Money` value object.
-Description: Create a safe money type that stores currency and amount in minor units.
-Input: Currency code and integer amount in minor units.
-Output: Immutable `Money` with add/subtract/compare methods.
-Hint: Use an enum for currencies and forbid cross-currency math.
+## ~~Question 01: Implement `Currency` enum and `Money` value object.~~
+### ~~Description: Create a safe money type that stores currency and amount in minor units.~~
+  - ~~**Input**: Currency code and integer amount in minor units.~~
+  - ~~**Output**: Immutable `Money` with add/subtract/compare methods.~~
+  - *Hint*: Use an enum for currencies and forbid cross-currency math.~~
 
-Question 02: Implement branded IDs and factories (`TenantId`, `WalletId`, `TransactionId`).
-Description: Create nominal types for IDs to prevent mixing identifiers.
-Input: Raw string values.
-Output: Branded ID types with factory functions.
-Hint: Use a `Brand<T, B>` helper type.
+## ~~Question 02: Implement branded IDs and factories (`TenantId`, `WalletId`, `TransactionId`).~~
+### ~~Description: Create nominal types for IDs to prevent mixing identifiers.~~
+  - ~~**Input**: Raw string values.~~
+  - ~~**Output**: Branded ID types with factory functions.~~
+  - ~~*Hint*: Use a `Brand<T, B>` helper type.~~
 
-Question 03: Implement `DomainError` and `Result<T>` types.
-Description: Provide a uniform way to return success or failure from domain rules.
-Input: Success payload or error code/message.
-Output: `Result<T>` discriminated union.
-Hint: Use `ok: true | false` to drive narrowing.
+## ~~Question 03: Implement `DomainError` and `Result<T>` types.~~
+### ~~Description: Provide a uniform way to return success or failure from domain rules.~~
+  - ~~**Input**: Success payload or error code/message.~~
+  - ~~**Output**: `Result<T>` discriminated union.~~
+  - ~~*Hint*: Use `ok: true | false` to drive narrowing.~~
 
-Question 04: Implement `TenantPlan` type or enum.
-Description: Represent plan tiers and their capabilities.
-Input: Plan key, limits, and features.
-Output: `TenantPlan` model with readonly fields.
-Hint: Keep plan configuration separate from the tenant entity.
+## Question 04: Implement `TenantPlan` type or enum.
 
-Question 05: Implement `PricingPlan` model.
-Description: Store fee and routing rules that drive strategy selection.
-Input: Plan id, fee rules, routing rules.
-Output: `PricingPlan` instance with accessors.
-Hint: Prefer readonly arrays for rules.
+### Description: Represent plan tiers and their capabilities. The plan should include limits and features that affect fee and routing strategies.
+- **Input**: Plan key, limits, and features. Fields might include max transaction amount, allowed currencies, fee strategy type, and routing strategy type.
+- **Output**: `TenantPlan` model with readonly fields. This can be a class or a simple type depending on your design choice.
+- *Hint*: Keep plan configuration separate from the tenant entity. 
+
+## Question 05: Implement `PricingPlan` model.
+### Description: Store fee and routing rules that drive strategy selection.
+- **Input**: Plan id, fee rules, routing rules.
+- **Output**: `PricingPlan` instance with accessors.
+- *Hint*: Prefer readonly arrays for rules.
 
 Question 06: Implement `Tenant` entity.
 Description: Model tenant identity and plan assignment behavior.
