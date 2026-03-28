@@ -1,14 +1,6 @@
-export class DomainError extends Error {
-  readonly code: string;
-
-  constructor(code: string, message: string) {
-    super(message);
-    this.code = code;
-    Object.setPrototypeOf(this, DomainError.prototype);
-  }
-}
+import type { DomainError } from "../../shared/domain/DomainError";
 
 export type Failure = {
-  ok: false;
-  error: DomainError;
+	ok: false;
+	error: DomainError;
 };

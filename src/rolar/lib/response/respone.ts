@@ -1,8 +1,10 @@
-export type Result<T> = Success<T> | Failure;
-
-import type { Failure, Success } from ".";
-
 export { success, failure };
+
+import type { Failure } from ".";
+
+import type { Success } from ".";
+
+export type Result<T> = Success<T> | Failure;
 
 const success = <T>(value: T): Success<T> => ({ ok: true, value });
 
