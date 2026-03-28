@@ -44,25 +44,25 @@ flowchart TD
 - **Output**: `TenantPlan` model with readonly fields. This can be a class or a simple type depending on your design choice.
 - *Hint*: Keep plan configuration separate from the tenant entity. 
 
-## Question 05: Implement `PricingPlan` model.
+## ~~Question 05: Implement `PricingPlan` model.~~
 ### Description: Store fee and routing rules that drive strategy selection.
 - **Input**: Plan id, fee rules, routing rules.
 - **Output**: `PricingPlan` instance with accessors.
 - *Hint*: Prefer readonly arrays for rules.
 
-Question 06: Implement `Tenant` entity.
-Description: Model tenant identity and plan assignment behavior.
-Input: `TenantId`, name, slug, and `PricingPlan`.
-Output: `Tenant` with `changePlan()` enforcing invariants.
-Hint: Keep plan changes inside the entity method.
+## ~~Question 06: Implement `Tenant` entity .~~
+### Description: Model tenant identity and plan assignment behavior.
+- **Input**: name, slug, and `PricingPlan`.
+- **Output**: `Tenant` with `changePlan()` enforcing invariants.
+- **Hint**: Keep plan changes inside the entity method in the domain layer in `${modules/tenant/Tenant.ts}`.
 
-Question 07: Implement `WalletPolicy` value object.
-Description: Encapsulate overdraft, currency, and limit rules.
-Input: Policy flags and numeric limits.
-Output: Immutable `WalletPolicy` with validation helpers.
-Hint: Avoid storing policy in application services.
+## Question 07: Implement `WalletPolicy` value object.
+### Description: Encapsulate overdraft, currency, and limit rules.
+- **Input**: Policy flags and numeric limits. 
+- **Output**: Immutable `WalletPolicy` with validation helpers.
+- **Hint**: Avoid storing policy in application services.
 
-Question 08: Implement `Wallet` entity with balance invariant.
+## Question 08: Implement `Wallet` entity with balance invariant.
 Description: Hold balance and apply policy when updating funds.
 Input: `WalletId`, `TenantId`, currency, policy, initial `Money`.
 Output: `Wallet` that rejects invalid balance changes.

@@ -1,28 +1,57 @@
 import { createTenantId, type TenantId } from "../../../lib/brand";
-import { createTenantPlan, type TenantPlan, type TenantPlanConfig } from "./TenantPlan";
+import type { PricingPlan } from "../../pricing/domain/PricingPlan";
+import type { TenantPlan } from "./TenantPlan";
 
-interface ITenant<T extends TenantPlan = TenantPlan> {
-  name: string;
-  plan: T;
-  createdAt: Date;
-  updatedAt: Date;
-  planConfig: TenantPlanConfig<T>;
+export type TenantProps<T extends TenantPlan> = Readonly<{
+	id: TenantId;
+	name: string;
+	slug: string;
+	pricingPlan: PricingPlan<T>;
+	createdAt?: Date;
+	updatedAt?: Date;
+}>;
+
+export class Tenant {
+	readonly id: TenantId;
+	readonly name: string;
+	readonly slug: string;
+	readonly createdAt: Date;
+	private _updatedAt: Date;
+	private _pricingPlan: PricingPlan<TenantPlan>;
+
+	constructor(props: TenantProps<TenantPlan>) {
+		this.id = props.id;
+		this.name = props.name;
+		this.slug = props.slug;
+		this.createdAt = props.createdAt ?? new Date();
+		this._updatedAt = props.updatedAt ?? new Date();
+		this._pricingPlan = props.pricingPlan;
+	}
+
+	static create(
+		name: string,
+		slug: string,
+		pricingPlan: PricingPlan<TenantPlan>,
+		id?: TenantId
+	): Tenant {
+		const tenantId = id ?? createTenantId(`${Date.now()}`);
+		return new Tenant({ id: tenantId, name, slug, pricingPlan });
+	}
+
+	get updatedAt(): Date {
+		return this._updatedAt;
+	}
+
+	get pricingPlan(): PricingPlan<TenantPlan> {
+		return this._pricingPlan;
+	}
+
+	changePlan(newPlan: PricingPlan<TenantPlan>): void {
+		if (newPlan.id === this._pricingPlan.id) {
+			throw new Error("Tenant already uses this pricing plan.");
+		}
+
+		this._pricingPlan = newPlan;
+		this._updatedAt = new Date();
+	}
 }
-
-export class Tenant<T extends TenantPlan> implements ITenant<T> {
-  readonly createdAt: Date = new Date();
-  updatedAt: Date = new Date();
-  plan: T;
-  planConfig: TenantPlanConfig<T>;
-
-  static id: TenantId = createTenantId(`${Date.now()}`);
-  
-  constructor(
-    public name: string,
-    plan: T
-  ) {
-    this.plan = plan;
-    this.planConfig = createTenantPlan(plan);
-  }
-}
-// const tenant = new Tenant("Acme Corp", "pro");
