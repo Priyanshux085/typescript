@@ -1,54 +1,41 @@
 // USER SIDE VIEW || END USER SIDE VIEW
 import { ReportContext } from "./context/report-context";
-import { CSVReport, JSONReport, PDFReport, type ReportStrategy } from "./strategies";
+import { ReportContainer } from "./di/container";
+import {
+  type FileType,
+} from "./di/report-context-map";
 
-const reportContext = new ReportContext<any>()
-
-enum FileType {
-  csv = "csv",
-  json = "json",
-  pdf = "pdf",
-}
-
-const reportContextMap = new Map<keyof typeof FileType, ReportStrategy<any>>();
-
-reportContextMap.set("csv", new CSVReport());
-reportContextMap.set("json", new JSONReport());
-reportContextMap.set("pdf", new PDFReport());
-
-console.log("reportContextMap: \n", reportContextMap);
-
-reportContext.setStrategy(reportContextMap.get("csv")!);
-reportContext.setStrategy(reportContextMap.get("pdf")!);
-reportContext.setStrategy(reportContextMap.get("json")!);
+const container = new ReportContainer();
+const context = new ReportContext();
 
 async function generateReport(fileType: keyof typeof FileType): Promise<any> {
-  const strategy = reportContextMap.get(fileType);
-  if (!strategy) {
-    throw new Error(`Report strategy for file type ${fileType} not found`);
-  }
-  reportContext.setStrategy(strategy);
-  return await reportContext.generateReport();
-}
+	
+	const strategy = container.getStrategy(fileType);
+	
+	context.setStrategy(strategy);
+	return await context.generateReport();
+} 
 
 // Example usage
 (async () => {
-  try {
-    const csvReport = await generateReport("csv");
-    console.log("CSV Report:", csvReport);
+	try {
+		const csvReport = await generateReport("csv");
+		console.log("CSV Report:", csvReport);
 
-    const jsonReport = await generateReport("json");
-    console.log("JSON Report:", jsonReport);
+		const jsonReport = await generateReport("json");
+		console.log("JSON Report:", jsonReport);
 
-    const pdfReport = await generateReport("pdf");
-    console.log("PDF Report:", pdfReport);
+		const pdfReport = await generateReport("pdf");
+		console.log("PDF Report:", pdfReport);
 
-  } catch (error) {
-    console.error(error);
-  }
+		const xmlReport = await generateReport("xml");
+		console.log("XML Report:", xmlReport);
+	} catch (error) {
+		console.error(error);
+	}
 })();
 
 export async function UserService() {
-  const report = await generateReport("csv");
-  return report;
+	const report = await generateReport("csv");
+	return report;
 }
