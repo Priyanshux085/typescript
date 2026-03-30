@@ -43,7 +43,7 @@ export class FreePlan extends PricingPlan<"free"> {
     super("plan-free", "free");
   }
 
-  readonly feeRules: readonly FeeRule[] = [
+  override readonly feeRules: readonly FeeRule[] = [
     {
       id: "free-tier-fee",
       name: "Free Tier Fee",
@@ -82,7 +82,7 @@ export class FreePlan extends PricingPlan<"free"> {
     },
   ];
 
-  readonly routeRules: readonly RouteRule[] = [
+  override readonly routeRules: readonly RouteRule[] = [
     {
       id: "free-tier-routes",
       name: "Free Tier Routes",
@@ -98,7 +98,7 @@ export class ProPlan extends PricingPlan<"pro"> {
     super("plan-pro", "pro");
   }
 
-  readonly feeRules: readonly FeeRule[] = [
+  override readonly feeRules: readonly FeeRule[] = [
     {
       id: "pro-tier-fee",
       name: "Pro Tier Fee",
@@ -130,7 +130,7 @@ export class ProPlan extends PricingPlan<"pro"> {
     },
   ];
 
-  readonly routeRules: readonly RouteRule[] = [
+  override readonly routeRules: readonly RouteRule[] = [
     {
       id: "pro-tier-routes",
       name: "Pro Tier Routes",
@@ -146,7 +146,7 @@ export class EnterprisePlan extends PricingPlan<"enterprise"> {
     super("plan-enterprise", "enterprise");
   }
 
-  readonly feeRules: readonly FeeRule[] = [
+  override readonly feeRules: readonly FeeRule[] = [
     {
       id: "enterprise-tier-fee",
       name: "Enterprise Tier Fee",
@@ -178,7 +178,7 @@ export class EnterprisePlan extends PricingPlan<"enterprise"> {
     },
   ];
 
-  readonly routeRules: readonly RouteRule[] = [
+  override readonly routeRules: readonly RouteRule[] = [
     {
       id: "enterprise-tier-routes",
       name: "Enterprise Tier Routes",
