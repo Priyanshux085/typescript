@@ -60,7 +60,7 @@ flowchart TD
 ### Description: Encapsulate overdraft, currency, and limit rules.
 - **Input**: Policy flags and numeric limits. 
 - **Output**: Immutable `WalletPolicy` with validation helpers.
-- **Hint**: Avoid storing policy in application services.
+- **Hint**: Avoid storing policy in application services. It should be part of the wallet entity or a related value object in the domain layer in `${modules/wallet/domain/WalletPolicy.ts}`.
 
 ## Question 08: Implement `Wallet` entity with balance invariant.
 Description: Hold balance and apply policy when updating funds.
