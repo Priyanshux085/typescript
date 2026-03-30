@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -noEmit",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "game": "bun --watch --run factory-pattern/game/index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

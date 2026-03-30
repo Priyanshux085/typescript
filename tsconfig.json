@@ -10,7 +10,8 @@
 
 		"paths": {
 			"@/*": ["box/*"],
-			"@box": ["box/index.ts"]
+			"@box": ["box/index.ts"],
+			"game/*": ["../factory-pattern/game/*"],
 		},
 
 		// Bundler mode
@@ -25,6 +26,8 @@
 		// Some stricter flags (disabled by default)
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
-		"noPropertyAccessFromIndexSignature": false
-	}
+		"noPropertyAccessFromIndexSignature": false,
+	},
+	"include": ["src/", "factory-pattern/"],
+	"exclude": ["node_modules/", "dist/"]
 }
