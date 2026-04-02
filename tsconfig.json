@@ -12,6 +12,7 @@
 			"@/*": ["box/*"],
 			"@box": ["box/index.ts"],
 			"game/*": ["../factory-pattern/game/*"],
+			"@collaro/*": ["../collaro/*"]
 		},
 
 		// Bundler mode
@@ -28,6 +29,6 @@
 		"noUnusedParameters": false,
 		"noPropertyAccessFromIndexSignature": false,
 	},
-	"include": ["src/", "factory-pattern/"],
+	"include": ["src/", "factory-pattern/", "collaro/"],
 	"exclude": ["node_modules/", "dist/"]
 }
