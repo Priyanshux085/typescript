@@ -1,30 +1,38 @@
-import { IMemberDTO } from "@collaro/member/interface";
 import { IUserDTO } from "@collaro/user";
-import { MemberId, WorkspaceId } from "@collaro/utils/brand";
+import { BRAND } from "@collaro/utils/brand";
+
+export type TWorkspaceId = BRAND<"WorkspaceId">;
 
 /**
  * IWorkspaceDTO represents the data transfer object for a workspace, 
  * containing properties such as id, name, description, createdAt, and updatedAt.
  */
 export interface IWorkspaceDTO {
-  id: WorkspaceId;
+  id: TWorkspaceId;
   name: string;
+  slug: string;
   logoUrl?: string;
   ownerId: IUserDTO["id"];
   description: string;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 export interface IWorkspace {
   workspace: IWorkspaceDTO;
-  members: IMemberDTO[];
 
   // methods
-  createWorkspace(workspace: IWorkspaceDTO): void;
-  getWorkspace(id: WorkspaceId): IWorkspaceDTO | null;
-  updateWorkspace(id: WorkspaceId, workspace: Partial<IWorkspaceDTO>): void;
-  deleteWorkspace(id: WorkspaceId): void;
-  uploadLogo(id: WorkspaceId, logo: string): void;
-  banMember(workspaceId: WorkspaceId, memberId: MemberId  ): void;
+  createWorkspace(workspace: Omit<IWorkspaceDTO, "id">): IWorkspaceDTO;
+  getWorkspace(id: TWorkspaceId): IWorkspaceDTO | null;
+  updateWorkspace(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): void;
+  deleteWorkspace(id: TWorkspaceId): void;
+  uploadLogo(id: TWorkspaceId, logo: string): void;
+}
+
+export interface IWorkspaceStore {
+  save(workspace: IWorkspaceDTO): void;
+  findById(id: TWorkspaceId): IWorkspaceDTO | null;
+  update(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): void;
+  delete(id: TWorkspaceId): void;
+  list(): IWorkspaceDTO[];
 }
