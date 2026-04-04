@@ -28,7 +28,9 @@ export interface IMeetingDTO<T> {
   createdAt: Date;
 }
 
-export type IWorkspaceMeetingDTO = IMeetingDTO<TMemberId>;
+export interface IWorkspaceMeetingDTO extends IMeetingDTO<TMemberId> {
+  workspaceId: TWorkspaceId;
+}
 
 export interface IMeeting<T> {
   meeting: IMeetingDTO<T>;
@@ -40,7 +42,7 @@ export interface IMeeting<T> {
   deleteMeeting(id: TMeetingId): void;
 }
 
-export type TeamMeetingDTO = IMeetingDTO<TMemberId>
+export type TeamMeetingDTO = IMeetingDTO<TMemberId> & { workspaceId: TWorkspaceId };
 
 export interface IWorkspaceMeeting {
   meeting: IWorkspaceMeetingDTO;

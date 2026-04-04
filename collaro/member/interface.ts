@@ -34,6 +34,7 @@ export interface IMemberStore {
   update(id: TMemberId, member: Partial<IMemberDTO>): void;
   delete(id: TMemberId): void;
   list(): IMemberDTO[];
+  checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): boolean;
 }
 
 export interface IWorkspaceMemberManager {
@@ -42,8 +43,8 @@ export interface IWorkspaceMemberManager {
   user: IUser;
 
   createWorkspace(workspace: Input<IWorkspaceDTO>): void;
-  addMemberToWorkspace(workspaceId: IWorkspaceDTO["id"], userId: IUserDTO["id"]): void;
-  getWorkspaceMembers(workspaceId: IWorkspaceDTO["id"]): IMemberDTO[];
-  banMemberFromWorkspace(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): void;
+  joinWorkspace(workspaceId: IWorkspaceDTO["id"], userId: IUserDTO["id"]): void;
+  listMembers(workspaceId: IWorkspaceDTO["id"]): IMemberDTO[];
+  banMember(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): void;
   removeMemberFromWorkspace(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): void;
 }

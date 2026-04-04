@@ -62,8 +62,6 @@ const localStorage: IMemberDTO[] = [];
 
 export class MemberStore implements IMemberStore {
   save(member: IMemberDTO): void {
-    // Implementation to save a member to the store
-    console.log("Saving member to store:", member);
     localStorage.push(member);
   }
 
@@ -90,5 +88,11 @@ export class MemberStore implements IMemberStore {
     memberToUpdate.name = member.name || memberToUpdate.name;
     memberToUpdate.role = member.role || memberToUpdate.role;
     memberToUpdate.updatedAt = new Date();
+  }
+
+  checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): boolean {
+    const memberExists = localStorage.some(member => member.id === memberId && member.workspaceId === workspaceId);
+    console.log(`Checking if member with ID: ${memberId} exists in workspace ID: ${workspaceId}: ${memberExists}`);
+    return memberExists;
   }
 }

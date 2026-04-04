@@ -1,0 +1,1 @@
+export type Input<T> = Omit<T, "id" | "createdAt" | "updatedAt">;

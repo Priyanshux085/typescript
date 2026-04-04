@@ -17,6 +17,7 @@
 
 		// Bundler mode
 		"moduleResolution": "node",
+		"ignoreDeprecations": "6.0",
 		"noEmit": false,
 		"strict": true,
 		"skipLibCheck": true,
