@@ -92,7 +92,6 @@ export class MemberStore implements IMemberStore {
 
   checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): boolean {
     const memberExists = localStorage.some(member => member.id === memberId && member.workspaceId === workspaceId);
-    console.log(`Checking if member with ID: ${memberId} exists in workspace ID: ${workspaceId}: ${memberExists}`);
     return memberExists;
   }
 }

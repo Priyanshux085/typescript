@@ -41,7 +41,11 @@ export class PrivateMeeting extends MeetingBase<PrivateMeetingDTO> {
   }
 
   override getMeeting(id: TMeetingId): PrivateMeetingDTO | null {
-    return this.store.findById(id);
+    const meeting = this.store.findById(id);
+    if (!meeting) {
+      return null;
+    }
+    return meeting as unknown as PrivateMeetingDTO;
   }
 
   override deleteMeeting(id: TMeetingId): void {
@@ -58,14 +62,17 @@ export class TeamMeeting extends MeetingBase<IWorkspaceMeetingDTO, Input<TeamMee
   participantStore: IParticipantStore = new ParticipantStore();
   meeting: IWorkspaceMeetingDTO = {} as IWorkspaceMeetingDTO;
 
-  private findMemberById(id: TMemberId): TeamMeetingDTO | null {
-    const participant = this.participantStore.listParticipants(this.meeting.id).find(p => p.memberId === id);
+  private async findMemberById(id: TMemberId): Promise<TeamMeetingDTO | null> {
+    const participant = await this.participantStore.listParticipants(this.meeting.id)
+    
     if (!participant) {
       console.log(`Member with ID ${id} is not a participant of this meeting.`);
       return null;
     }
-    
-    return this.store.findById(this.meeting.id);
+    return {
+      ...this.meeting,
+      workspaceId: this.meeting.workspaceId,
+    } as TeamMeetingDTO;
   }
 
   override createMeeting(input: TMeetingInput<IWorkspaceMeetingDTO>): IWorkspaceMeetingDTO {
@@ -76,6 +83,7 @@ export class TeamMeeting extends MeetingBase<IWorkspaceMeetingDTO, Input<TeamMee
       id: Id,
       title: input.title,
       createdBy: input.createdBy,
+      workspaceId: input.workspaceId,
       status: "Scheduled",
       createdAt: new Date(),
       description: input.description,
@@ -113,7 +121,7 @@ export class TeamMeeting extends MeetingBase<IWorkspaceMeetingDTO, Input<TeamMee
       return null;
     }
 
-    return meeting as IWorkspaceMeetingDTO;
+    return meeting as unknown as IWorkspaceMeetingDTO;
   }
 
   override updateMeeting(id: TMeetingId, data: Partial<IWorkspaceMeetingDTO>): void {

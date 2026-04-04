@@ -22,8 +22,8 @@ export interface IParticipantDTO {
 export interface IParticipantStore {
   member: IMember;
 
-  addParticipant(participant: Input<IParticipantDTO>): void;
-  removeParticipant(meetingId: TMeetingId): void;
-  listParticipants(meetingId: TMeetingId): IParticipantDTO[];
-  endMeetingForParticipant(meetingId: TMeetingId): void;
+  addParticipant(participant: Input<IParticipantDTO>): Promise<void>;
+  removeParticipant(meetingId: TMeetingId): Promise<void>;
+  listParticipants(meetingId: TMeetingId): Promise<IParticipantDTO[]>;
+  endMeetingForParticipant(meetingId: TMeetingId): Promise<void>;
 }

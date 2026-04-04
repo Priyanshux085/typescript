@@ -8,27 +8,28 @@ const localStorage: IParticipantDTO[] = [];
 export class ParticipantStore implements IParticipantStore {
   member: IMember = new Member();
 
-  addParticipant(participant: Input<IParticipantDTO>): void {
-    localStorage.push({
+  async addParticipant(participant: Input<IParticipantDTO>): Promise<void> {
+    const member: IParticipantDTO = {
       ...participant,
       joinedAt: new Date(),
       leaveAt: null,
-    });
+    }
+    localStorage.push(member);
   }
 
-  listParticipants(meetingId: TMeetingId): IParticipantDTO[] {
-    return localStorage.filter((p) => p.meetingId === meetingId);
+  async listParticipants(meetingId: TMeetingId): Promise<IParticipantDTO[]> {
+    return Promise.resolve(localStorage.filter((p) => p.meetingId === meetingId));
   }
 
-  removeParticipant(meetingId: TMeetingId): void {
+  async removeParticipant(meetingId: TMeetingId): Promise<void> {
     const index = localStorage.findIndex((p) => p.meetingId === meetingId);
     if (index !== -1 && localStorage[index]) {
       localStorage[index].leaveAt = new Date();
     }
   }
 
-  endMeetingForParticipant(meetingId: TMeetingId): void {
-    const participants = this.listParticipants(meetingId);
+  async endMeetingForParticipant(meetingId: TMeetingId): Promise<void> {
+    const participants = await this.listParticipants(meetingId);
     participants.forEach((p) => {
       if (!p.leaveAt) {
         p.leaveAt = new Date();

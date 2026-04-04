@@ -1,4 +1,4 @@
-import { IMeetingStore, IParticipantStore, IWorkspaceMeetingDTO, MemoryWorkspaceMeetingStore, ParticipantStore, TeamMeetingDTO, TMeetingId } from "@collaro/meeting";
+import { IMeetingStore, IParticipantDTO, IParticipantStore, IWorkspaceMeetingDTO, MemoryWorkspaceMeetingStore, ParticipantStore, TeamMeetingDTO, TMeetingId } from "@collaro/meeting";
 import { IMemberDTO, IWorkspaceMemberManager, TMemberId, WorkspaceMemberManager } from "@collaro/member";
 import { ID } from "@collaro/utils/generate";
 import { Input } from "@collaro/utils/omit";
@@ -54,10 +54,10 @@ export class WorkspaceMeetingManager {
       }
   
       // Save meeting to store
-      this.meetingStore.save(meeting);
+      await this.meetingStore.save(meeting);
   
       // Add creator as participant to that meeting
-      this.participantStore.addParticipant({
+      await this.participantStore.addParticipant({
         meetingId: meeting.id,
         memberId: input.createdBy,
         name: member.name,
@@ -86,7 +86,7 @@ export class WorkspaceMeetingManager {
 
       const member = await this.validateMember(memberId);
 
-      this.participantStore.addParticipant({
+      await this.participantStore.addParticipant({
         meetingId,
         memberId,
         name: member.name,
@@ -101,7 +101,7 @@ export class WorkspaceMeetingManager {
         [member.name]: memberId
       };
   
-      this.meetingStore.update(meetingId, { 
+      await this.meetingStore.update(meetingId, { 
         participants: updatedParticipants }
       );
       
@@ -112,7 +112,7 @@ export class WorkspaceMeetingManager {
   }
 
   async getMeeting(id: TMeetingId): Promise<TeamMeetingDTO | null> {
-    const meeting = this.meetingStore.findById(id);
+    const meeting = await this.meetingStore.findById(id);
     return meeting as unknown as TeamMeetingDTO | null;
   }
 
@@ -122,7 +122,7 @@ export class WorkspaceMeetingManager {
       throw new Error(`Meeting with ID: ${meetingId} not found`);
     }
 
-    this.meetingStore.update(meetingId, { status });
+    await this.meetingStore.update(meetingId, { status });
   }
 
   async endMeeting(meetingId: TMeetingId): Promise<void> {
@@ -131,11 +131,15 @@ export class WorkspaceMeetingManager {
       throw new Error(`Meeting with ID: ${meetingId} not found`);
     }
     
-    this.meetingStore.update(meetingId, { 
+    await this.meetingStore.update(meetingId, { 
       status: "Completed",
       endTime: new Date(),
      });
 
-    this.participantStore.endMeetingForParticipant(meetingId);
+    await this.participantStore.endMeetingForParticipant(meetingId);
+  }
+
+  async listParticipants(meetingId: TMeetingId): Promise<IParticipantDTO[]> {
+    return await this.participantStore.listParticipants(meetingId);
   }
 }
