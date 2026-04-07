@@ -6,7 +6,7 @@ const workspaceMemberManager = new WorkspaceMemberManager();
 const userService = new User();
 
 // Create a new user to be added as a member to the workspace
-const newUser = userService.createUser({
+const newUser = await userService.createUser({
   name: "Jane Doe",
   email: "jane.doe@example.com",
   password: "securepassword",
@@ -14,13 +14,11 @@ const newUser = userService.createUser({
 }); 
 
 // Create a new workspace
-const workspace = workspaceMemberManager.createWorkspace({
+const workspace = await workspaceMemberManager.createWorkspace({
   name: "Project Alpha",
   description: "Workspace for Project Alpha",
   slug: "project-alpha",
   ownerId: newUser.id,
-  createdAt: new Date(),
-  updatedAt: null,
 });
 
 const secondUserInput: TCreateUserInput = {
@@ -30,9 +28,19 @@ const secondUserInput: TCreateUserInput = {
   userName: generateUserName("Bob Smith"),
 }
 
-const secondUser = userService.createUser(secondUserInput);
+const secondUser = await userService.createUser(secondUserInput);
 
-workspaceMemberManager.addMemberToWorkspace(workspace.id, secondUser.id);
-console.log("Added member details:", secondUser);
+const user_01_Details = await workspaceMemberManager.listMemberDetails({
+  userID: newUser.id,
+  workspaceId: workspace.id
+});
 
-workspaceMemberManager.getWorkspaceMembers(workspace.id);
+await workspaceMemberManager.requestWorkspace(workspace.id, secondUser.id)
+
+const [joinRequests] = await workspaceMemberManager.listRequests(workspace.id);
+
+const approvedMember = await workspaceMemberManager.approveJoinRequest(joinRequests!.id,user_01_Details!.id);
+
+console.log("Added member details:", approvedMember);
+
+await workspaceMemberManager.findWorkspaceById(workspace.id);

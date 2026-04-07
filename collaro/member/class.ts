@@ -61,37 +61,39 @@ export class Member implements IMember {
 const localStorage: IMemberDTO[] = [];
 
 export class MemberStore implements IMemberStore {
-  save(member: IMemberDTO): void {
+  async save(member: IMemberDTO): Promise<void> {
     localStorage.push(member);
+    return Promise.resolve();
   }
 
-  findById(id: TMemberId): IMemberDTO | null {    
+  async findById(id: TMemberId): Promise<IMemberDTO | null> {    
     const member = localStorage.find(member => member.id === id);
-    return member ?? null;
+
+    return Promise.resolve(member ?? null);
   }
 
-  delete(id: TMemberId): void {
-    console.log(`Deleting member with ID: ${id}`);
-
+  async delete(id: TMemberId): Promise<void> {
     localStorage.splice(localStorage.findIndex(member => member.id === id), 1);
+    return Promise.resolve();
   }
 
-  list(): IMemberDTO[] {
-    return localStorage;
+  async list(): Promise<IMemberDTO[]> {
+    return Promise.resolve(localStorage);
   }
 
-  update(id: TMemberId, member: Partial<IMemberDTO>): void {
-    const memberToUpdate = this.findById(id);
-    
+  async update(id: TMemberId, member: Partial<IMemberDTO>): Promise<void> {
+    const memberToUpdate = await this.findById(id);
+
     if (!memberToUpdate) throw new Error(`Member with ID: ${id} not found. Cannot update.`);
 
     memberToUpdate.name = member.name || memberToUpdate.name;
     memberToUpdate.role = member.role || memberToUpdate.role;
     memberToUpdate.updatedAt = new Date();
+    return Promise.resolve();
   }
 
-  checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): boolean {
+  async checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<boolean> {
     const memberExists = localStorage.some(member => member.id === memberId && member.workspaceId === workspaceId);
-    return memberExists;
+    return Promise.resolve(memberExists);
   }
 }

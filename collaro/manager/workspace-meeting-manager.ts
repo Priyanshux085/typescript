@@ -1,11 +1,12 @@
 import { IMeetingStore, IParticipantDTO, IParticipantStore, IWorkspaceMeetingDTO, MemoryWorkspaceMeetingStore, ParticipantStore, TeamMeetingDTO, TMeetingId } from "@collaro/meeting";
-import { IMemberDTO, IWorkspaceMemberManager, TMemberId, WorkspaceMemberManager } from "@collaro/member";
+import { IMemberDTO, IMemberStore, IWorkspaceMemberManager, MemberStore, TMemberId, WorkspaceMemberManager } from "@collaro/member";
 import { ID } from "@collaro/utils/generate";
 import { Input } from "@collaro/utils/omit";
 import { IWorkspaceDTO } from "@collaro/workspace/interface";
 
 export class WorkspaceMeetingManager {
   manager: IWorkspaceMemberManager = new WorkspaceMemberManager();
+  memberStore: IMemberStore = new MemberStore();
   participantStore: IParticipantStore = new ParticipantStore();
   meetingStore: IMeetingStore<TMemberId> = new MemoryWorkspaceMeetingStore();
   
@@ -15,7 +16,7 @@ export class WorkspaceMeetingManager {
       throw new Error(`Meeting with ID: ${meetingId} not found`);
     }
 
-    const checkExists = await this.manager.memberStore.checkMemberExists(meeting.workspaceId, memberId);
+    const checkExists = await this.memberStore.checkMemberExists(meeting.workspaceId, memberId);
     if (!checkExists) {
       throw new Error(`Member with Id ${memberId} does not exist in workspace with ID: ${meeting.workspaceId}`);
     }
@@ -24,7 +25,7 @@ export class WorkspaceMeetingManager {
   }
 
   async validateMember(memberId: TMemberId): Promise<IMemberDTO> {
-    const member = await this.manager.memberStore.findById(memberId);
+    const member = await this.memberStore.findById(memberId);
     if (!member) {
       throw new Error(`Member with ID: ${memberId} not found`);
     }
@@ -33,7 +34,7 @@ export class WorkspaceMeetingManager {
 
   async createMeeting(input: Omit<Input<TeamMeetingDTO>, "participants" | "endTime">, workspaceId: IWorkspaceDTO["id"]): Promise<TeamMeetingDTO> {
     try {
-      const checkExists = await this.manager.memberStore.checkMemberExists(workspaceId, input.createdBy);
+      const checkExists = await this.memberStore.checkMemberExists(workspaceId, input.createdBy);
       if (!checkExists) {
         throw new Error(`Member with Id ${input.createdBy} does not exist in workspace with ID: ${workspaceId}`);
       }

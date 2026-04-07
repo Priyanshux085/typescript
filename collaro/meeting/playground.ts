@@ -11,7 +11,7 @@ async function main() {
 
   const userService = new User();
 
-  const user_01 = userService.createUser({
+  const user_01 = await userService.createUser({
     email: "john@example.com",
     name: "John Doe",
     password: "password123",
@@ -35,14 +35,14 @@ async function main() {
 
   const workspace = new WorkspaceMemberManager()
 
-  const createdWorkspace = workspace.createWorkspace({
+  const createdWorkspace = await workspace.createWorkspace({
     name: "Workspace 1",
     description: "This is the first workspace",
     ownerId: user_01.id,
     slug: "workspace-1",
   })
 
-  const member = workspace.getMemberDetails({
+  const member = await workspace.listMemberDetails({
     userID: user_01.id,
     workspaceId: createdWorkspace.id,
   });
@@ -54,7 +54,8 @@ async function main() {
 
   const teamMeetingInput = new TeamMeeting();
 
-  const meeting = teamMeetingInput.createMeeting({
+  const meeting = await teamMeetingInput.createMeeting({
+    workspaceId: createdWorkspace.id,
     title: "Team Meeting",
     description: "This is a team meeting",
     createdBy: member.id,
