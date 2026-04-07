@@ -1,6 +1,8 @@
 import { TMeetingId, TWorkspaceId } from "@collaro/meeting";
 import { TMemberId } from "@collaro/member";
+import { TNotificationId } from "@collaro/notification/interface";
 import { TUserId } from "@collaro/user";
+import { TRequestId } from "@collaro/workspace/member-request/interface";
 import { randomUUIDv7 } from "bun";
 
 function generateId<T>(): T {
@@ -36,6 +38,20 @@ export class ID {
     const id = generateId<TMeetingId>();
     const result = `${prefix}${id}`.slice(0, 32);
     return result as unknown as TMeetingId;
+  }
+
+  static notificationId(): TNotificationId {
+    const prefix = "ntf_";
+    const id = generateId<TNotificationId>();
+    const result = `${prefix}${id}`.slice(0, 32);
+    return result as unknown as TNotificationId;
+  }
+
+  static requestId(): TRequestId {
+    const prefix = "req_";
+    const id = generateId<TRequestId>();
+    const result = `${prefix}${id}`.slice(0, 32);
+    return result as unknown as TRequestId;
   }
 }
 

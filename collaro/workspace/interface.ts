@@ -22,17 +22,17 @@ export interface IWorkspace {
   workspace: IWorkspaceDTO;
 
   // methods
-  createWorkspace(workspace: Omit<IWorkspaceDTO, "id">): IWorkspaceDTO;
-  getWorkspace(id: TWorkspaceId): IWorkspaceDTO | null;
-  updateWorkspace(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): void;
-  deleteWorkspace(id: TWorkspaceId): void;
-  uploadLogo(id: TWorkspaceId, logo: string): void;
+  createWorkspace(workspace: Omit<IWorkspaceDTO, "id">): Promise<IWorkspaceDTO>;
+  getWorkspace(id: TWorkspaceId): Promise<IWorkspaceDTO | null>;
+  updateWorkspace(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): Promise<void>;
+  deleteWorkspace(id: TWorkspaceId): Promise<void>;
+  uploadLogo(id: TWorkspaceId, logo: string): Promise<void>;
 }
 
 export interface IWorkspaceStore {
-  save(workspace: IWorkspaceDTO): void;
-  findById(id: TWorkspaceId): IWorkspaceDTO | null;
-  update(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): void;
-  delete(id: TWorkspaceId): void;
-  list(): IWorkspaceDTO[];
+  save(workspace: IWorkspaceDTO): Promise<void>;
+  findById(id: TWorkspaceId): Promise<IWorkspaceDTO | null>;
+  update(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): Promise<void>;
+  delete(id: TWorkspaceId): Promise<void>;
+  list(): Promise<IWorkspaceDTO[]>;
 }

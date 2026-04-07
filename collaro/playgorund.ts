@@ -8,21 +8,21 @@ const meetingManager = new WorkspaceMeetingManager();
 
 async function main() {
   try {
-    const user01 = userService.createUser({
+    const user01 = await userService.createUser({
       name: "Tony Stark",
       email: "tony.stark@avengers.com",
       password: "password123",
       userName: generateUserName("Tony Stark")
     });
     
-    const avengers = workspaceManager.createWorkspace({
+    const avengers = await workspaceManager.createWorkspace({
       name: "Team Avengers",
       description: "Workspace for the Avengers team",
       ownerId: user01.id,
       slug: generateWorkspaceSlug("Team Avengers")
     });
     
-    const memberDetails = await workspaceManager.getMemberDetails({
+    const memberDetails = await workspaceManager.listMemberDetails({
       userID: user01.id,
       workspaceId: avengers.id
     });
@@ -37,7 +37,7 @@ async function main() {
     }, avengers.id);
     console.log("Created Meeting:", avengersMeeting);
 
-    const user02 = userService.createUser({
+    const user02 = await userService.createUser({
       name: "Steve Rogers",
       email: "steve.rogers@avengers.com",
       password: "password123",
@@ -45,9 +45,9 @@ async function main() {
     });
       
     // Steve Rogers joins the Avengers workspace
-    workspaceManager.joinWorkspace(avengers.id, user02.id);
+    await workspaceManager.requestWorkspace(avengers.id, user02.id);
 
-    const memberDetails02 = await workspaceManager.getMemberDetails({
+    const memberDetails02 = await workspaceManager.listMemberDetails({
       userID: user02.id,
       workspaceId: avengers.id
     });

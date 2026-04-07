@@ -18,7 +18,7 @@ export class User implements IUser {
   createUser(input: TCreateUserInput): IUserDTO {
     const newUser: IUserDTO = {
       ...input,
-      id: ID.userId(input.email),
+      id: ID.userId(),
       createdAt: new Date(),
       updatedAt: null,
     };
