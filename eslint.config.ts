@@ -4,11 +4,14 @@ import { node } from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
+	tseslint.configs.recommended,
 	{
 		files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
 		plugins: { js },
 		extends: ["js/recommended"],
 		languageOptions: { globals: node },
+		"rules": {
+			"no-unused-vars": "off",
+		}
 	},
-	tseslint.configs.recommended,
 ]);

@@ -3,24 +3,26 @@
 		// Environment setup & latest features
 		"lib": ["ES2024"],
 		"moduleDetection": "force",
-		"jsx": "react-jsx",
 		"allowJs": true,
-		"baseUrl": "./src",
+		"baseUrl": ".",
 		"outDir": "./dist",
-
+		"moduleResolution": "bundler",
+		
 		"paths": {
-			"@/*": ["box/*"],
-			"@box": ["box/index.ts"],
-			"game/*": ["../factory-pattern/game/*"],
-			"@collaro/*": ["../collaro/*"]
+			"@/*": ["src/box/*"],
+			"@box": ["src/box/index.ts"],
+			"game/*": ["factory-pattern/game/*"],
+			"@collaro/*": ["collaro/*"],
 		},
-
+		
 		// Bundler mode
-		"moduleResolution": "node",
-		"ignoreDeprecations": "6.0",
-		"noEmit": false,
+		"module": "esnext",
+		"target": "ES2020",
+		"noEmit": true,
 		"strict": true,
 		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedIndexedAccess": true,
 		"noImplicitOverride": true,
