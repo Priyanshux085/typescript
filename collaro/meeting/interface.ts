@@ -2,7 +2,7 @@ import { TWorkspaceId } from "../workspace";
 import { BRAND } from "@collaro/utils/brand";
 import { Input } from "@collaro/utils/omit";
 import { IParticipantStore } from "./stores";
-import { TMemberId } from "@collaro/member";
+import { TMemberId } from "@collaro/workspace/member";
 
 export type TMeetingId = BRAND<"MeetingId">;
 export type { TWorkspaceId };

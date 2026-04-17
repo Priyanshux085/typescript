@@ -14,7 +14,7 @@ import {
   IParticipantDTO,
 } from "./index";
 import { ID } from "@collaro/utils/generate";
-import { TMemberId } from "@collaro/member/interface";
+import { TMemberId } from "@collaro/workspace/member/interface";
 import { TUserId } from "@collaro/user";
 
 export type TMeetingInput<T> = Omit<Input<T>, "participants">

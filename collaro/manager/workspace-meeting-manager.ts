@@ -1,8 +1,15 @@
 import { IMeetingStore, IParticipantDTO, IParticipantStore, IWorkspaceMeetingDTO, MemoryWorkspaceMeetingStore, ParticipantStore, TeamMeetingDTO, TMeetingId } from "@collaro/meeting";
-import { IMemberDTO, IMemberStore, IWorkspaceMemberManager, MemberStore, TMemberId, WorkspaceMemberManager } from "@collaro/member";
+import {
+	IMemberDTO,
+	IMemberStore,
+	IWorkspaceMemberManager,
+	MemberStore,
+	TMemberId,
+} from "@collaro/workspace/member";
 import { ID } from "@collaro/utils/generate";
 import { Input } from "@collaro/utils/omit";
 import { IWorkspaceDTO } from "@collaro/workspace/interface";
+import { WorkspaceMemberManager } from "./workspace-manager";
 
 export class WorkspaceMeetingManager {
   manager: IWorkspaceMemberManager = new WorkspaceMemberManager();

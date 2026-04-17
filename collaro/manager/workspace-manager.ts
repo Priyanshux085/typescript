@@ -1,23 +1,55 @@
 import { ID } from "@collaro/utils/generate";
-import { IMemberDTO, IMemberStore, IWorkspaceMemberManager, MemberStore, TMemberId } from "../member/index";
-import { IRequestMember, IRequestMemberDTO, IWorkspaceDTO, IWorkspaceStore, MemoryWorkspaceStore, RequestMember, TRequestId } from "@collaro/workspace";
+import { Input } from "@collaro/utils/omit";
+import {
+	WorkspaceNotification,
+	workspaceNotification,
+} from "@collaro/notification";
+import { SubscriptionEnforcer, TSubscriptionPlan } from "@collaro/subscription";
+import {
+	MemoryRoleStore,
+	RoleManager,
+	ROLE_LIMITS_BY_SUBSCRIPTION,
+	IRoleValidationResult,
+	TPermission,
+	TRoleId,
+} from "@collaro/workspace/member/role";
 import { IUser, IUserDTO, User } from "@collaro/user";
 import { MemberSorting } from "@collaro/sorting/interface";
-import { Input } from "@collaro/utils/omit";
-import { WorkspaceNotification, workspaceNotification } from "@collaro/notification";
-import { SubscriptionEnforcer } from "@collaro/subscription";
+import {
+	IMemberDTO,
+	IMemberStore,
+	IWorkspaceMemberManager,
+	TMemberId,
+	MemberStore,
+} from "@collaro/workspace/member";
+
+import { IWorkspaceDTO, IWorkspaceStore } from "../workspace/interface";
+import { MemoryWorkspaceStore } from "../workspace/stores/memory-workspace-store";
+import {
+	IRequestMember,
+	IRequestMemberDTO,
+	TRequestId,
+} from "../workspace/member-request/interface";
+import { RequestMember } from "../workspace/member-request/class";
 
 export class WorkspaceMemberManager implements IWorkspaceMemberManager {
-  private memberStore: IMemberStore = new MemberStore();
-  private workspaceStore: IWorkspaceStore = new MemoryWorkspaceStore();
-  private notificationService: WorkspaceNotification = workspaceNotification;
-  private requestService: IRequestMember = new RequestMember();
-  private user: IUser = new User();
+	private memberStore: IMemberStore = new MemberStore();
+	private workspaceStore: IWorkspaceStore = new MemoryWorkspaceStore();
+	private notificationService: WorkspaceNotification = workspaceNotification;
+	private requestService: IRequestMember = new RequestMember();
+	private user: IUser = new User();
+	private roleStore = new MemoryRoleStore();
 
-  private sorting = new MemberSorting();
+	private sorting = new MemberSorting();
 
-  private async joinWorkspace(workspaceId: IWorkspaceDTO["id"], userId: IUserDTO["id"]): Promise<IMemberDTO> {
-		// 1. Validate if the workspace exists.
+	private getRoleManager(subscription: TSubscriptionPlan): RoleManager {
+		return new RoleManager(this.roleStore, subscription);
+	}
+
+	private async joinWorkspace(
+		workspaceId: IWorkspaceDTO["id"],
+		userId: IUserDTO["id"]
+	): Promise<IMemberDTO> {
 		const workspace = await this.findWorkspaceById(workspaceId);
 		if (!workspace) {
 			throw new Error(
@@ -25,35 +57,50 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			);
 		}
 
-		// 2. Validate if the user exists.
 		const user = this.user.getUser(userId);
-		if (!user)
+		if (!user) {
 			throw new Error(
 				`User with ID: ${userId} not found. Cannot join workspace.`
 			);
+		}
 
-		// 3. Enforce subscription limits before adding member.
 		const currentMembers = await this.listMembers(workspaceId);
 		SubscriptionEnforcer.enforceMemberAddition({
 			currentPlan: workspace.subscription,
 			currentMemberCount: currentMembers.length,
 		});
 
-		// 4. Create a new member entry for the user in the workspace.
-		const newMember: IMemberDTO & { role: "admin" | "member" } = {
-			id: ID.memberId(),
-			name: user!.name,
+		const roleManager = this.getRoleManager(workspace.subscription);
+		await roleManager.seedWorkspaceRoles(workspaceId);
+		const memberRole = await roleManager.getPredefinedRole(
 			workspaceId,
-			role: "admin",
+			"member"
+		);
+		if (!memberRole) {
+			throw new Error(
+				`Default member role not found for workspace ${workspaceId}.`
+			);
+		}
+
+		const newMember: IMemberDTO = {
+			id: ID.memberId(),
+			name: user.name,
+			workspaceId,
+			role: memberRole.key,
+			roleId: memberRole.id,
 			createdAt: new Date(),
 			updatedAt: null,
 			userId,
 		};
 
-		// 5. Save the new member to the store.
-		this.memberStore.save(newMember);
+		await this.memberStore.save(newMember);
+		await roleManager.assignRoleToMember(
+			String(newMember.id),
+			workspaceId,
+			memberRole.id,
+			"system"
+		);
 
-		// 6. Send a notification to the user about joining the workspace.
 		await this.notificationService.createMemberNotification({
 			type: "request_approved",
 			userName: user.userName,
@@ -63,7 +110,6 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			workspaceId: workspaceId,
 		});
 
-		// 7. Send a notification to the workspace owner about the new member joining.
 		await this.notificationService.createWorkspaceNotification({
 			userName: user.userName,
 			type: "workspace_joined",
@@ -73,16 +119,18 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			memberID: newMember.id,
 		});
 
-		return Promise.resolve(newMember);
+		return newMember;
 	}
 
-  async findWorkspaceById(id: IWorkspaceDTO["id"]): Promise<IWorkspaceDTO | null> {
-    const workspace = await this.workspaceStore.findById(id);
-    return workspace;
-  }
-  
-  async createWorkspace(workspace: Input<IWorkspaceDTO>): Promise<IWorkspaceDTO> {
-		// Fetch the owner user details to ensure the owner exists before creating the workspace.
+	async findWorkspaceById(
+		id: IWorkspaceDTO["id"]
+	): Promise<IWorkspaceDTO | null> {
+		return this.workspaceStore.findById(id);
+	}
+
+	async createWorkspace(
+		workspace: Input<IWorkspaceDTO>
+	): Promise<IWorkspaceDTO> {
 		const user = await this.user.getUser(workspace.ownerId);
 		if (!user) {
 			console.log(
@@ -91,7 +139,6 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			throw new Error(`Owner with ID: ${workspace.ownerId} not found.`);
 		}
 
-		// Create a new workspace with subscription plan (default to "free" if not provided)
 		const newWorkspace: IWorkspaceDTO = {
 			...workspace,
 			id: ID.workspaceId(),
@@ -99,21 +146,38 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			createdAt: new Date(),
 			updatedAt: null,
 		};
-		this.workspaceStore.save(newWorkspace);
 
-		// Create a default admin member for the new workspace (owner)
+		await this.workspaceStore.save(newWorkspace);
+
+		const roleManager = this.getRoleManager(newWorkspace.subscription);
+		await roleManager.seedWorkspaceRoles(newWorkspace.id);
+		const ownerRole = await roleManager.getPredefinedRole(
+			newWorkspace.id,
+			"owner"
+		);
+		if (!ownerRole) {
+			throw new Error(`Owner role not found for workspace ${newWorkspace.id}.`);
+		}
+
 		const ownerMember: IMemberDTO = {
 			userId: workspace.ownerId,
 			id: ID.memberId(),
 			workspaceId: newWorkspace.id,
 			name: `${user.name} Owner`,
-			role: "admin",
+			role: ownerRole.key,
+			roleId: ownerRole.id,
 			createdAt: new Date(),
 			updatedAt: null,
 		};
-		this.memberStore.save(ownerMember);
 
-		// Create a notification for the workspace creation.
+		await this.memberStore.save(ownerMember);
+		await roleManager.assignRoleToMember(
+			String(ownerMember.id),
+			newWorkspace.id,
+			ownerRole.id,
+			"system"
+		);
+
 		await this.notificationService.createWorkspaceNotification({
 			workspaceName: newWorkspace.name,
 			type: "workspace_created",
@@ -122,227 +186,314 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			workspaceId: newWorkspace.id,
 		});
 
-		return Promise.resolve(newWorkspace);
+		return newWorkspace;
 	}
 
-  async updateWorkspace(
-    workspaceId: IWorkspaceDTO["id"], 
-    workspaceData: Partial<Omit<IWorkspaceDTO, "id" | "createdAt" | "updatedAt">>, 
-    memberId: TMemberId
-  ): Promise<IWorkspaceDTO> {
-    // 1. Validate if the workspace exists.
-    const existingWorkspace = await this.memberStore.checkMemberExists(workspaceId, memberId);
-    if (!existingWorkspace) {
-      console.log(`Workspace with ID: ${workspaceId} not found. Cannot update workspace.`);
-      throw new Error(`Workspace with ID: ${workspaceId} not found.`);
-    }
+	async updateWorkspace(
+		workspaceId: IWorkspaceDTO["id"],
+		workspaceData: Partial<
+			Omit<IWorkspaceDTO, "id" | "createdAt" | "updatedAt">
+		>,
+		memberId: TMemberId
+	): Promise<IWorkspaceDTO> {
+		const memberExists = await this.memberStore.checkMemberExists(
+			workspaceId,
+			memberId
+		);
+		if (!memberExists) {
+			throw new Error(
+				`Workspace with ID: ${workspaceId} not found. Cannot update workspace.`
+			);
+		}
 
-    const workspaceDetail = await this.findWorkspaceById(workspaceId);
-    
-    const member = await this.memberStore.findById(memberId);
+		const workspaceDetail = await this.findWorkspaceById(workspaceId);
+		if (!workspaceDetail) {
+			throw new Error(`Workspace with ID: ${workspaceId} not found.`);
+		}
 
-    if (!member || member.role === "member") {
-      throw new Error("Only workspace admins can update workspace details.");
-    }
+		const member = await this.memberStore.findById(memberId);
+		if (!member) {
+			throw new Error("Member not found.");
+		}
 
-    const dto: IWorkspaceDTO = {
-      ...workspaceDetail!,
-      ...workspaceData,
-      updatedAt: new Date(),
-    }
-    
-    // 2. Update the workspace details in the store.
-    await this.workspaceStore.update(workspaceId, dto);
-    
-    // 3. Send a notification to all workspace members about the workspace update.
-    await this.notificationService.createWorkspaceNotification({
-      workspaceName: dto.name,
-      type: "workspace_updated",
-      userId: workspaceDetail!.ownerId,
-      workspaceId: workspaceId,
-      memberID: memberId,
-      userName: member.name,
-    })
+		const roleManager = this.getRoleManager(workspaceDetail.subscription);
+		const canUpdate = await roleManager.hasPermission(
+			member.roleId,
+			"edit_settings:workspace"
+		);
+		if (!canUpdate.hasPermission) {
+			throw new Error(
+				canUpdate.reason ||
+					"Only workspace admins can update workspace details."
+			);
+		}
 
-    return dto;
-  }
+		const dto: IWorkspaceDTO = {
+			...workspaceDetail,
+			...workspaceData,
+			updatedAt: new Date(),
+		};
 
-  async approveJoinRequest(requestId: TRequestId, approvedBy: TMemberId): Promise<IMemberDTO> {
-    try {
-      // 1. Fetch the join request details.
-      const request = await this.requestService.getRequest(requestId);
-      if (!request) {
-        throw new Error(`Join request with ID: ${requestId} not found.`);
-      }
-      
-      // 2. Validate if the approver is a member of the workspace 
-      const approver = await this.memberStore.checkMemberExists(request.workspaceId, approvedBy);
-      if (!approver) {
-        throw new Error("Approver is not a member of the workspace. Cannot approve join request.");
-      }
+		await this.workspaceStore.update(workspaceId, dto);
 
-      // 3. Validate if the approver has sufficient permissions to approve the join request (e.g., admin or owner).
-      const approverDetails = await this.memberStore.findById(approvedBy);
-      if (!approverDetails || approverDetails.role === "member") {
-        throw new Error("Approver does not have sufficient permissions to approve join requests.");
-      }
-  
-      // 4. Approve the join request and update the request status in the store.
-      const result = await this.requestService.approveRequest(requestId);  
-      if (!result || !result.success) {
-        throw new Error(`Failed to approve join request with ID: ${requestId}.`);
-      }
-  
-      // 5. Add the user as a member of the workspace.
-      const newMember = await this.joinWorkspace(request.workspaceId, request.userId);
-  
-      return newMember;
-    } catch (error: unknown) {
-      throw new Error(`Error approving join request: ${(error as Error).message}`, {
-        cause: error,
-      });
-    }
-  }
+		await this.notificationService.createWorkspaceNotification({
+			workspaceName: dto.name,
+			type: "workspace_updated",
+			userId: workspaceDetail.ownerId,
+			workspaceId,
+			memberID: memberId,
+			userName: member.name,
+		});
 
-  async rejectJoinRequest(requestId: TRequestId, rejectedBy: TMemberId): Promise<void> {
-    try {
-      // 1. Fetch the join request details.
-      const request = await this.requestService.getRequest(requestId);
-      if (!request) {
-        throw new Error(`Join request with ID: ${requestId} not found.`);
-      }
+		return dto;
+	}
 
-      // 2. Validate if the rejector is a member of the workspace
-      const rejector = await this.memberStore.checkMemberExists(request.workspaceId, rejectedBy);
-      if (!rejector) {
-        throw new Error("Rejector is not a member of the workspace. Cannot reject join request.");
-      }
-      
-      // 3. Validate if the rejector has sufficient permissions to reject the join request (e.g., admin or owner). 
-      const rejectorDetails = await this.memberStore.findById(rejectedBy);
-      if (!rejectorDetails || rejectorDetails.role === "member") {
-        throw new Error("Rejector does not have sufficient permissions to reject join requests.");
-      }
+	async approveJoinRequest(
+		requestId: TRequestId,
+		approvedBy: TMemberId
+	): Promise<IMemberDTO> {
+		try {
+			const request = await this.requestService.getRequest(requestId);
+			if (!request) {
+				throw new Error(`Join request with ID: ${requestId} not found.`);
+			}
 
-      const workspace = await this.findWorkspaceById(request.workspaceId);
+			const approverExists = await this.memberStore.checkMemberExists(
+				request.workspaceId,
+				approvedBy
+			);
+			if (!approverExists) {
+				throw new Error(
+					"Approver is not a member of the workspace. Cannot approve join request."
+				);
+			}
 
-      // 4. Reject the join request and update the request status in the store.
-      await this.requestService.rejectRequest(requestId);
+			const approverDetails = await this.memberStore.findById(approvedBy);
+			const workspace = await this.findWorkspaceById(request.workspaceId);
+			if (!approverDetails || !workspace) {
+				throw new Error("Approver or workspace not found.");
+			}
 
-      await this.notificationService.createMemberNotification({
-        type: "request_rejected",
-        userName: request.name,
-        workspaceName: workspace!.name,
-        userId: request.userId,
-        workspaceId: request.workspaceId,
-      });
+			const roleManager = this.getRoleManager(workspace.subscription);
+			const canManage = await roleManager.hasPermission(
+				approverDetails.roleId,
+				"manage_roles:workspace"
+			);
+			if (!canManage.hasPermission) {
+				throw new Error(
+					canManage.reason ||
+						"Approver does not have sufficient permissions to approve join requests."
+				);
+			}
 
-    } catch (error: unknown) {
-      throw new Error(`Error rejecting join request: ${(error as Error).message}`, {
-        cause: error,
-      });
-    }
-  }
+			const result = await this.requestService.approveRequest(requestId);
+			if (!result || !result.success) {
+				throw new Error(
+					`Failed to approve join request with ID: ${requestId}.`
+				);
+			}
 
-  async banMember(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<void> {
-    // Implementation to ban a member from a workspace.
-    const member = await this.memberStore.findById(memberId);
+			return await this.joinWorkspace(request.workspaceId, request.userId);
+		} catch (error: unknown) {
+			throw new Error(
+				`Error approving join request: ${(error as Error).message}`,
+				{
+					cause: error,
+				}
+			);
+		}
+	}
 
-    const workspace = await this.findWorkspaceById(workspaceId);
+	async rejectJoinRequest(
+		requestId: TRequestId,
+		rejectedBy: TMemberId
+	): Promise<void> {
+		try {
+			const request = await this.requestService.getRequest(requestId);
+			if (!request) {
+				throw new Error(`Join request with ID: ${requestId} not found.`);
+			}
 
-    if (!member) {
-      throw new Error(`Member with ID: ${memberId} not found.`);
-    }
+			const rejectorExists = await this.memberStore.checkMemberExists(
+				request.workspaceId,
+				rejectedBy
+			);
+			if (!rejectorExists) {
+				throw new Error(
+					"Rejector is not a member of the workspace. Cannot reject join request."
+				);
+			}
 
-    if (!workspace) {
-      throw new Error(`Workspace with ID: ${workspaceId} not found.`);
-    }
+			const rejectorDetails = await this.memberStore.findById(rejectedBy);
+			const workspace = await this.findWorkspaceById(request.workspaceId);
+			if (!rejectorDetails || !workspace) {
+				throw new Error("Rejector or workspace not found.");
+			}
 
-    this.memberStore.update(memberId, member);
-    console.log(`Banning member with ID: ${memberId} from workspace ID: ${workspaceId}`);
-  }
+			const roleManager = this.getRoleManager(workspace.subscription);
+			const canManage = await roleManager.hasPermission(
+				rejectorDetails.roleId,
+				"manage_roles:workspace"
+			);
+			if (!canManage.hasPermission) {
+				throw new Error(
+					canManage.reason ||
+						"Rejector does not have sufficient permissions to reject join requests."
+				);
+			}
 
-  async listMembers(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]> {
-    try {
-      // Implementation to get a list of members in a workspace.
-      const member = this.memberStore;
-      const workspace = await this.findWorkspaceById(workspaceId);
-  
-      if (!workspace) {
-        console.log(`Workspace with ID: ${workspaceId} not found. Cannot fetch members.`);
-        throw new Error(`Workspace with ID: ${workspaceId} not found.`);
-      }
-  
-      const list = await member.list();
-      const workspaceMembers = list.filter(member => member.workspaceId === workspaceId);
-  
-      const sortedWorkspaceMembers = this.sorting.sortByName(workspaceMembers, "asc");
-  
-      return sortedWorkspaceMembers;
-    } catch (error) {
-      console.error(`Error fetching members for workspace ID: ${workspaceId}.`, error);
-      throw error;
-    }
-  }
+			await this.requestService.rejectRequest(requestId);
 
-  async removeMemberFromWorkspace(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<void> {
-    // 1. Validate Member exists
-    const memberExists = await this.memberStore.checkMemberExists(workspaceId, memberId);
-    if (!memberExists) {
-      throw new Error(`Member with ID: ${memberId} not found in workspace ID: ${workspaceId}.`);
-    }
+			await this.notificationService.createMemberNotification({
+				type: "request_rejected",
+				userName: request.name,
+				workspaceName: workspace.name,
+				userId: request.userId,
+				workspaceId: request.workspaceId,
+			});
+		} catch (error: unknown) {
+			throw new Error(
+				`Error rejecting join request: ${(error as Error).message}`,
+				{
+					cause: error,
+				}
+			);
+		}
+	}
 
-    const member = await this.memberStore.findById(memberId);
-    const workspace = await this.findWorkspaceById(workspaceId);
+	async banMember(
+		workspaceId: IWorkspaceDTO["id"],
+		memberId: TMemberId,
+		bannedBy?: TMemberId
+	): Promise<void> {
+		await this.removeMemberFromWorkspace(workspaceId, memberId, bannedBy);
+	}
 
-    // 2. Implementation to remove a member from a workspace.
-    await this.memberStore.delete(memberId);
+	async listMembers(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]> {
+		try {
+			const workspace = await this.findWorkspaceById(workspaceId);
+			if (!workspace) {
+				console.log(
+					`Workspace with ID: ${workspaceId} not found. Cannot fetch members.`
+				);
+				throw new Error(`Workspace with ID: ${workspaceId} not found.`);
+			}
 
-    // 3. Send a notification to the member about being removed from the workspace.
-    await this.notificationService.createMemberNotification({
-      type: "member_removed",
-      memberID: memberId,
-      workspaceId,
-      userId: member!.userId,
-      userName: member!.name,
-      workspaceName: workspace!.name,
-    })
-  }
+			const list = await this.memberStore.list();
+			const workspaceMembers = list.filter(
+				(member: IMemberDTO) => member.workspaceId === workspaceId
+			);
 
-  async listMemberDetails(
-    query: {
-      userID: IUserDTO["id"], 
-      workspaceId: IWorkspaceDTO["id"]
-    }): Promise<IMemberDTO | null> {
-    // Implementation to get member details based on user ID and workspace ID.
-    const { userID, workspaceId } = query;
+			return this.sorting.sortByName(workspaceMembers, "asc");
+		} catch (error) {
+			console.error(
+				`Error fetching members for workspace ID: ${workspaceId}.`,
+				error
+			);
+			throw error;
+		}
+	}
 
-    const user = await this.user.getUser(userID);
-    if (!user) {
-      throw new Error(`User with ID: ${userID} not found. Cannot fetch member details.`);
-    }
+	async removeMemberFromWorkspace(
+		workspaceId: IWorkspaceDTO["id"],
+		memberId: TMemberId,
+		removedBy?: TMemberId
+	): Promise<void> {
+		const memberExists = await this.memberStore.checkMemberExists(
+			workspaceId,
+			memberId
+		);
+		if (!memberExists) {
+			throw new Error(
+				`Member with ID: ${memberId} not found in workspace ID: ${workspaceId}.`
+			);
+		}
 
-    const members = await this.memberStore.list();
-    const memberDetails = members.find(member => member.userId === userID && member.workspaceId === workspaceId);
-    
-    if (!memberDetails) {
-      console.log(`Member details for user ID: ${userID} not found.`);
-      return null;
-    }
-    
-    return memberDetails;
-  }
+		const member = await this.memberStore.findById(memberId);
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!member || !workspace) {
+			throw new Error("Member or workspace not found.");
+		}
 
-  async requestWorkspace(workspaceId: IWorkspaceDTO["id"], userId: IUserDTO["id"]): Promise<void> {
-    const workspace = await this.findWorkspaceById(workspaceId);
-    
-    const user = await this.user.getUser(userId);
+		const roleManager = this.getRoleManager(workspace.subscription);
+		const targetRole = await roleManager.getMemberRole(
+			String(memberId),
+			workspaceId
+		);
+		if (targetRole?.key === "owner") {
+			throw new Error("Workspace owner cannot be removed.");
+		}
 
-    if (!workspace || !user) {
-      throw new Error(`Workspace or User not found. Cannot request to join workspace.`);
-    }
+		if (removedBy) {
+			const remover = await this.memberStore.findById(removedBy);
+			if (!remover) {
+				throw new Error("Requester not found.");
+			}
 
-    const request: IRequestMemberDTO = {
+			const canRemove = await roleManager.hasPermission(
+				remover.roleId,
+				"remove:member"
+			);
+			if (!canRemove.hasPermission) {
+				throw new Error(
+					canRemove.reason || "You do not have permission to remove members."
+				);
+			}
+		}
+
+		await this.roleStore.removeMemberRole(String(memberId), workspaceId);
+		await this.memberStore.delete(memberId);
+
+		await this.notificationService.createMemberNotification({
+			type: "member_removed",
+			memberID: memberId,
+			workspaceId,
+			userId: member.userId,
+			userName: member.name,
+			workspaceName: workspace.name,
+		});
+	}
+
+	async listMemberDetails(query: {
+		userID: IUserDTO["id"];
+		workspaceId: IWorkspaceDTO["id"];
+	}): Promise<IMemberDTO | null> {
+		const { userID, workspaceId } = query;
+
+		const user = await this.user.getUser(userID);
+		if (!user) {
+			throw new Error(
+				`User with ID: ${userID} not found. Cannot fetch member details.`
+			);
+		}
+
+		const members = await this.memberStore.list();
+		const memberDetails = members.find(
+			(member) => member.userId === userID && member.workspaceId === workspaceId
+		);
+
+		if (!memberDetails) {
+			console.log(`Member details for user ID: ${userID} not found.`);
+			return null;
+		}
+
+		return memberDetails;
+	}
+
+	async requestWorkspace(
+		workspaceId: IWorkspaceDTO["id"],
+		userId: IUserDTO["id"]
+	): Promise<void> {
+		const workspace = await this.findWorkspaceById(workspaceId);
+		const user = await this.user.getUser(userId);
+
+		if (!workspace || !user) {
+			throw new Error(
+				`Workspace or User not found. Cannot request to join workspace.`
+			);
+		}
+
+		const request: IRequestMemberDTO = {
 			id: ID.requestId(),
 			userId,
 			workspaceId,
@@ -353,28 +504,230 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			updatedAt: null,
 		};
 
-    // Save the join request to the store
-    const result = await this.requestService.createRequest(request);
+		const result = await this.requestService.createRequest(request);
 
-    // Send a notification to the workspace owner about the new join request
-    await this.notificationService.createMemberNotification({
-      workspaceName: workspace.name,
-      userName: user.userName,
-      type: "join_request",
-      userId: workspace.ownerId,
-      workspaceId,
-    });
+		await this.notificationService.createMemberNotification({
+			workspaceName: workspace.name,
+			userName: user.userName,
+			type: "join_request",
+			userId: workspace.ownerId,
+			workspaceId,
+		});
 
-    if (!result) {
-      throw new Error(`Failed to create join request for user ID: ${userId} and workspace ID: ${workspaceId}.`);
-    }
+		if (!result) {
+			throw new Error(
+				`Failed to create join request for user ID: ${userId} and workspace ID: ${workspaceId}.`
+			);
+		}
 
-    return Promise.resolve();
-  }
+		return Promise.resolve();
+	}
 
-  async listRequests(workspaceId: IWorkspaceDTO["id"]): Promise<IRequestMemberDTO[]> {
-   // fetch all join requests for a specific workspace
+	async listRequests(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IRequestMemberDTO[]> {
+		return this.requestService.listRequests(workspaceId);
+	}
 
-   return await this.requestService.listRequests(workspaceId);
-  }
+	async changeMemberRole(
+		workspaceId: IWorkspaceDTO["id"],
+		memberId: TMemberId,
+		newRoleId: TRoleId,
+		changedBy: TMemberId
+	): Promise<void> {
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!workspace) {
+			throw new Error(`Workspace with ID: ${workspaceId} not found.`);
+		}
+
+		const targetMember = await this.memberStore.findById(memberId);
+		const actor = await this.memberStore.findById(changedBy);
+		if (!targetMember || !actor) {
+			throw new Error("Member not found.");
+		}
+
+		const roleManager = this.getRoleManager(workspace.subscription);
+		const permission = await roleManager.hasPermission(
+			actor.roleId,
+			"manage_roles:workspace"
+		);
+		if (!permission.hasPermission) {
+			throw new Error(
+				permission.reason ||
+					"You do not have permission to manage member roles."
+			);
+		}
+
+		const nextRole = await roleManager.getRole(newRoleId);
+		if (!nextRole || nextRole.workspaceId !== workspaceId) {
+			throw new Error(
+				`Role with ID ${String(newRoleId)} not found in workspace ${workspaceId}.`
+			);
+		}
+
+		if (targetMember.role === "owner" && nextRole.key !== "owner") {
+			throw new Error("Workspace owner role cannot be changed.");
+		}
+
+		await this.memberStore.update(memberId, {
+			role: nextRole.key,
+			roleId: nextRole.id,
+			updatedAt: new Date(),
+		});
+
+		await roleManager.assignRoleToMember(
+			String(memberId),
+			workspaceId,
+			nextRole.id,
+			String(changedBy)
+		);
+	}
+
+	async bulkAssignRole(
+		workspaceId: IWorkspaceDTO["id"],
+		memberIds: readonly TMemberId[],
+		roleId: TRoleId,
+		assignedBy: TMemberId
+	): Promise<void> {
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!workspace) {
+			throw new Error(`Workspace with ID: ${workspaceId} not found.`);
+		}
+
+		if (
+			!ROLE_LIMITS_BY_SUBSCRIPTION[workspace.subscription].canUseBulkOperations
+		) {
+			throw new Error("Bulk role assignment is not available on this plan.");
+		}
+
+		const actor = await this.memberStore.findById(assignedBy);
+		if (!actor) {
+			throw new Error("Requester not found.");
+		}
+
+		const roleManager = this.getRoleManager(workspace.subscription);
+		const permission = await roleManager.hasPermission(
+			actor.roleId,
+			"manage_roles:workspace"
+		);
+		if (!permission.hasPermission) {
+			throw new Error(
+				permission.reason || "You do not have permission to bulk assign roles."
+			);
+		}
+
+		const nextRole = await roleManager.getRole(roleId);
+		if (!nextRole || nextRole.workspaceId !== workspaceId) {
+			throw new Error(
+				`Role with ID ${String(roleId)} not found in workspace ${workspaceId}.`
+			);
+		}
+
+		for (const candidateMemberId of memberIds) {
+			const candidateMember =
+				await this.memberStore.findById(candidateMemberId);
+			if (candidateMember?.role === "owner" && nextRole.key !== "owner") {
+				throw new Error("Workspace owner role cannot be changed.");
+			}
+		}
+
+		const result = await roleManager.bulkAssignRole({
+			workspaceId,
+			memberIds: memberIds.map((id) => String(id)),
+			roleId,
+			assignedBy: String(assignedBy),
+		});
+
+		for (const memberId of result.successful) {
+			await this.memberStore.update(memberId as unknown as TMemberId, {
+				role: nextRole.key,
+				roleId: nextRole.id,
+				updatedAt: new Date(),
+			});
+		}
+
+		if (result.failureCount > 0) {
+			console.warn(
+				`Bulk role assignment completed with ${result.failureCount} failures.`
+			);
+		}
+	}
+
+	async createCustomRole(
+		workspaceId: IWorkspaceDTO["id"],
+		name: string,
+		permissions: readonly TPermission[],
+		createdBy: TMemberId,
+		options?: { description?: string; parentRoleId?: TRoleId }
+	): Promise<IRoleValidationResult> {
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!workspace) {
+			return {
+				success: false,
+				code: "ROLE_NOT_FOUND",
+				message: `Workspace with ID: ${workspaceId} not found.`,
+			};
+		}
+
+		if (
+			!ROLE_LIMITS_BY_SUBSCRIPTION[workspace.subscription].canCreateCustomRoles
+		) {
+			return {
+				success: false,
+				code: "CUSTOM_ROLES_NOT_ALLOWED",
+				message: `${workspace.subscription} plan does not support custom roles.`,
+			};
+		}
+
+		const creator = await this.memberStore.findById(createdBy);
+		if (!creator) {
+			return {
+				success: false,
+				code: "INSUFFICIENT_PERMISSION",
+				message: "Requester not found.",
+			};
+		}
+
+		const roleManager = this.getRoleManager(workspace.subscription);
+		const permission = await roleManager.hasPermission(
+			creator.roleId,
+			"manage_roles:workspace"
+		);
+		if (!permission.hasPermission) {
+			return {
+				success: false,
+				code: "INSUFFICIENT_PERMISSION",
+				message:
+					permission.reason ||
+					"You do not have permission to create custom roles.",
+			};
+		}
+
+		return roleManager.createCustomRole(
+			workspaceId,
+			name,
+			permissions,
+			options
+		);
+	}
+
+	async checkMemberPermission(
+		workspaceId: IWorkspaceDTO["id"],
+		memberId: TMemberId,
+		permission: TPermission
+	): Promise<boolean> {
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!workspace) {
+			return false;
+		}
+
+		const member = await this.memberStore.findById(memberId);
+		if (!member) {
+			return false;
+		}
+
+		const roleManager = this.getRoleManager(workspace.subscription);
+		const result = await roleManager.hasPermission(member.roleId, permission);
+		return result.hasPermission;
+	}
 }

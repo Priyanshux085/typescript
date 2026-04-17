@@ -5,7 +5,7 @@ import {
 
 import { User } from "@collaro/user";
 // import { ID } from "@collaro/utils/generate";
-import { WorkspaceMemberManager } from "@collaro/member";
+import { WorkspaceMemberManager } from "@collaro/manager";
 
 async function main() {
 
