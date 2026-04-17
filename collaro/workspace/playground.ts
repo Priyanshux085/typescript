@@ -31,18 +31,20 @@ async function main() {
 
   // Create Workspaces
   const workspace = await workspaceManager.createWorkspace({
-    name: "Avengers",
-    description: "This is a test workspace",
-    ownerId: user01.id,
-    slug: "test-workspace"
-  });
+		name: "Avengers",
+		description: "This is a test workspace",
+		ownerId: user01.id,
+		slug: "test-workspace",
+		subscription: "pro",
+	});
 
   const workspace2 = await workspaceManager.createWorkspace({
-    name: "Justice League",
-    description: "Workspace for the Justice League team",
-    ownerId: user03.id,
-    slug: "justice_league"
-  });
+		name: "Justice League",
+		description: "Workspace for the Justice League team",
+		ownerId: user03.id,
+		slug: "justice_league",
+		subscription: "pro",
+	});
 
   // Request to join workspace
   await workspaceManager.requestWorkspace(workspace.id, user02.id);

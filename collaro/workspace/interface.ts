@@ -1,32 +1,44 @@
 import { IUserDTO } from "@collaro/user";
 import { BRAND } from "@collaro/utils/brand";
+import { TSubscriptionPlan } from "@collaro/subscription";
 
 export type TWorkspaceId = BRAND<"WorkspaceId">;
 
 /**
  * IWorkspaceDTO represents the data transfer object for a workspace, 
- * containing properties such as id, name, description, createdAt, and updatedAt.
+ * containing properties such as id, name, description, createdAt, updatedAt, and subscription plan.
+ * 
+ * The subscription property is readonly and controls member capacity limits.
+ * Only workspace owner can upgrade the subscription plan (no downgrades allowed).
  */
 export interface IWorkspaceDTO {
-  id: TWorkspaceId;
-  name: string;
-  slug: string;
-  logoUrl?: string;
-  ownerId: IUserDTO["id"];
-  description: string;
-  createdAt: Date;
-  updatedAt: Date | null;
+	id: TWorkspaceId;
+	name: string;
+	slug: string;
+	logoUrl?: string;
+	ownerId: IUserDTO["id"];
+	description: string;
+	readonly subscription: TSubscriptionPlan;
+	createdAt: Date;
+	updatedAt: Date | null;
 }
 
 export interface IWorkspace {
-  workspace: IWorkspaceDTO;
+	workspace: IWorkspaceDTO;
 
-  // methods
-  createWorkspace(workspace: Omit<IWorkspaceDTO, "id">): Promise<IWorkspaceDTO>;
-  getWorkspace(id: TWorkspaceId): Promise<IWorkspaceDTO | null>;
-  updateWorkspace(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): Promise<void>;
-  deleteWorkspace(id: TWorkspaceId): Promise<void>;
-  uploadLogo(id: TWorkspaceId, logo: string): Promise<void>;
+	// methods
+	createWorkspace(
+		workspace: Omit<IWorkspaceDTO, "id" | "subscription">,
+		subscription?: TSubscriptionPlan
+	): Promise<IWorkspaceDTO>;
+	getWorkspace(id: TWorkspaceId): Promise<IWorkspaceDTO | null>;
+	updateWorkspace(
+		id: TWorkspaceId,
+		workspace: Partial<IWorkspaceDTO>
+	): Promise<void>;
+	deleteWorkspace(id: TWorkspaceId): Promise<void>;
+	uploadLogo(id: TWorkspaceId, logo: string): Promise<void>;
+	upgradePlan(id: TWorkspaceId, newPlan: TSubscriptionPlan): Promise<void>;
 }
 
 export interface IWorkspaceStore {

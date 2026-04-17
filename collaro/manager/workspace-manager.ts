@@ -5,6 +5,7 @@ import { IUser, IUserDTO, User } from "@collaro/user";
 import { MemberSorting } from "@collaro/sorting/interface";
 import { Input } from "@collaro/utils/omit";
 import { WorkspaceNotification, workspaceNotification } from "@collaro/notification";
+import { SubscriptionEnforcer } from "@collaro/subscription";
 
 export class WorkspaceMemberManager implements IWorkspaceMemberManager {
   private memberStore: IMemberStore = new MemberStore();
@@ -16,52 +17,64 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
   private sorting = new MemberSorting();
 
   private async joinWorkspace(workspaceId: IWorkspaceDTO["id"], userId: IUserDTO["id"]): Promise<IMemberDTO> {
-    // 1. Validate if the workspace exists.
-    const workspace = await this.findWorkspaceById(workspaceId);
-    if (!workspace) {
-      throw new Error(`Workspace with ID: ${workspaceId} not found. Cannot join workspace.`);
-    }
+		// 1. Validate if the workspace exists.
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!workspace) {
+			throw new Error(
+				`Workspace with ID: ${workspaceId} not found. Cannot join workspace.`
+			);
+		}
 
-    // 2. Validate if the user exists.
-    const user = this.user.getUser(userId);
-    if (!user) throw new Error(`User with ID: ${userId} not found. Cannot join workspace.`);
+		// 2. Validate if the user exists.
+		const user = this.user.getUser(userId);
+		if (!user)
+			throw new Error(
+				`User with ID: ${userId} not found. Cannot join workspace.`
+			);
 
-    // 3. Create a new member entry for the user in the workspace.
-    const newMember: IMemberDTO & { role: "admin" | "member" } = {
-      id: ID.memberId(),
-      name: user!.name,
-      workspaceId,
-      role: "admin",
-      createdAt: new Date(),
-      updatedAt: null,
-      userId,
-    };
+		// 3. Enforce subscription limits before adding member.
+		const currentMembers = await this.listMembers(workspaceId);
+		SubscriptionEnforcer.enforceMemberAddition({
+			currentPlan: workspace.subscription,
+			currentMemberCount: currentMembers.length,
+		});
 
-    // 4. Save the new member to the store.
-    this.memberStore.save(newMember);
+		// 4. Create a new member entry for the user in the workspace.
+		const newMember: IMemberDTO & { role: "admin" | "member" } = {
+			id: ID.memberId(),
+			name: user!.name,
+			workspaceId,
+			role: "admin",
+			createdAt: new Date(),
+			updatedAt: null,
+			userId,
+		};
 
-    // 5. Send a notification to the user about joining the workspace.
-    await this.notificationService.createMemberNotification({
-      type: "request_approved",
-      userName: user.userName,
-      workspaceName: workspace.name || workspace.slug,
-      memberID: newMember.id,
-      userId: user.id,
-      workspaceId: workspaceId,
-    });
-  
-    // 6. Send a notification to the workspace owner about the new member joining.
-    await this.notificationService.createWorkspaceNotification({
-      userName: user.userName,
-      type: "workspace_joined",
-      userId: workspace.ownerId,
-      workspaceId: workspaceId,
-      workspaceName: workspace.name,
-      memberID: newMember.id,
-    });
+		// 5. Save the new member to the store.
+		this.memberStore.save(newMember);
 
-    return Promise.resolve(newMember);
-  }
+		// 6. Send a notification to the user about joining the workspace.
+		await this.notificationService.createMemberNotification({
+			type: "request_approved",
+			userName: user.userName,
+			workspaceName: workspace.name || workspace.slug,
+			memberID: newMember.id,
+			userId: user.id,
+			workspaceId: workspaceId,
+		});
+
+		// 7. Send a notification to the workspace owner about the new member joining.
+		await this.notificationService.createWorkspaceNotification({
+			userName: user.userName,
+			type: "workspace_joined",
+			userId: workspace.ownerId,
+			workspaceId: workspaceId,
+			workspaceName: workspace.name,
+			memberID: newMember.id,
+		});
+
+		return Promise.resolve(newMember);
+	}
 
   async findWorkspaceById(id: IWorkspaceDTO["id"]): Promise<IWorkspaceDTO | null> {
     const workspace = await this.workspaceStore.findById(id);
@@ -69,45 +82,48 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
   }
   
   async createWorkspace(workspace: Input<IWorkspaceDTO>): Promise<IWorkspaceDTO> {
-    // Fetch the owner user details to ensure the owner exists before creating the workspace.
-    const user = await this.user.getUser(workspace.ownerId);
-    if (!user) {
-      console.log(`Owner with ID: ${workspace.ownerId} not found. Cannot create workspace.`);
-      throw new Error(`Owner with ID: ${workspace.ownerId} not found.`);
-    }
-    
-    // Implementation to create a new workspace.
-    const newWorkspace: IWorkspaceDTO = {
-      ...workspace,
-      id: ID.workspaceId(),
-      createdAt: new Date(),
-      updatedAt: null,
-    };
-    this.workspaceStore.save(newWorkspace);
-        
-    // Implementation to create a default admin member for the new workspace.
-    const ownerMember: IMemberDTO = {
-      userId: workspace.ownerId,
-      id: ID.memberId(),
-      workspaceId: newWorkspace.id,
-      name: `${user.name} Owner`,
-      role: 'admin',
-      createdAt: new Date(),
-      updatedAt: null,
-    };
-    this.memberStore.save(ownerMember);
+		// Fetch the owner user details to ensure the owner exists before creating the workspace.
+		const user = await this.user.getUser(workspace.ownerId);
+		if (!user) {
+			console.log(
+				`Owner with ID: ${workspace.ownerId} not found. Cannot create workspace.`
+			);
+			throw new Error(`Owner with ID: ${workspace.ownerId} not found.`);
+		}
 
-    // Create a notification for the workspace creation.
-    await this.notificationService.createWorkspaceNotification({
-      workspaceName: newWorkspace.name,
-      type: "workspace_created",
-      memberID: ownerMember.id,
-      userId: workspace.ownerId,
-      workspaceId: newWorkspace.id,
-    })
+		// Create a new workspace with subscription plan (default to "free" if not provided)
+		const newWorkspace: IWorkspaceDTO = {
+			...workspace,
+			id: ID.workspaceId(),
+			subscription: workspace.subscription || "free",
+			createdAt: new Date(),
+			updatedAt: null,
+		};
+		this.workspaceStore.save(newWorkspace);
 
-    return Promise.resolve(newWorkspace);
-  }
+		// Create a default admin member for the new workspace (owner)
+		const ownerMember: IMemberDTO = {
+			userId: workspace.ownerId,
+			id: ID.memberId(),
+			workspaceId: newWorkspace.id,
+			name: `${user.name} Owner`,
+			role: "admin",
+			createdAt: new Date(),
+			updatedAt: null,
+		};
+		this.memberStore.save(ownerMember);
+
+		// Create a notification for the workspace creation.
+		await this.notificationService.createWorkspaceNotification({
+			workspaceName: newWorkspace.name,
+			type: "workspace_created",
+			memberID: ownerMember.id,
+			userId: workspace.ownerId,
+			workspaceId: newWorkspace.id,
+		});
+
+		return Promise.resolve(newWorkspace);
+	}
 
   async updateWorkspace(
     workspaceId: IWorkspaceDTO["id"], 
@@ -327,14 +343,15 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
     }
 
     const request: IRequestMemberDTO = {
-      id: ID.requestId(),
-      userId,
-      workspaceId,
-      name: user.name,
-      role: "member",
-      createdAt: new Date(),
-      updatedAt: null,
-    };
+			id: ID.requestId(),
+			userId,
+			workspaceId,
+			name: user.name,
+			status: "pending",
+			role: "member",
+			createdAt: new Date(),
+			updatedAt: null,
+		};
 
     // Save the join request to the store
     const result = await this.requestService.createRequest(request);

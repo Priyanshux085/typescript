@@ -5,14 +5,19 @@ import { INotificationStore } from "@collaro/notification";
 
 export type TRequestId = BRAND<"RequestId">;
 
+export type DEFAULT_MEMBER_ROLE = "member";
+
+export type TRequestStatus = "pending" | "approved" | "rejected";
+
 export interface IRequestMemberDTO {
-  id: TRequestId;
-  name: string;
-  userId: IUserDTO["id"];
-  workspaceId: IWorkspaceDTO["id"];
-  role: 'admin' | 'member';
-  createdAt: Date;
-  updatedAt: Date | null;
+	id: TRequestId;
+	name: string;
+	status: TRequestStatus;
+	userId: IUserDTO["id"];
+	workspaceId: IWorkspaceDTO["id"];
+	role: DEFAULT_MEMBER_ROLE;
+	createdAt: Date;
+	updatedAt: Date | null;
 }
 
 export type Input<T> = Omit<T, "id" | "createdAt" | "updatedAt">;
@@ -22,16 +27,21 @@ export type returnDTO = {
   message: string;
 }
 
-export interface IRequestMember {
-  request: IRequestMemberDTO;
-  store: IMemberRequestStore; 
+export type InputRequestMemberDTO = Omit<
+	IRequestMemberDTO,
+	"id" | "createdAt" | "updatedAt" | "status"
+>;
 
-  // methods
-  createRequest(request: Input<IRequestMemberDTO>): Promise<IRequestMemberDTO>;
-  getRequest(id: TRequestId ): Promise<IRequestMemberDTO | null>;
-  approveRequest(id: TRequestId ): Promise<returnDTO>;
-  rejectRequest(id: TRequestId ): Promise<returnDTO>;
-  listRequests(workspaceId: IWorkspaceDTO["id"]): Promise<IRequestMemberDTO[]>;
+export interface IRequestMember {
+	request: IRequestMemberDTO;
+	store: IMemberRequestStore;
+
+	// methods
+	createRequest(request: InputRequestMemberDTO): Promise<IRequestMemberDTO>;
+	getRequest(id: TRequestId): Promise<IRequestMemberDTO | null>;
+	approveRequest(id: TRequestId): Promise<returnDTO>;
+	rejectRequest(id: TRequestId): Promise<returnDTO>;
+	listRequests(workspaceId: IWorkspaceDTO["id"]): Promise<IRequestMemberDTO[]>;
 }
 
 export type MemberRequestParams = {
