@@ -15,10 +15,11 @@ const newUser = await userService.createUser({
 
 // Create a new workspace
 const workspace = await workspaceMemberManager.createWorkspace({
-  name: "Project Alpha",
-  description: "Workspace for Project Alpha",
-  slug: "project-alpha",
-  ownerId: newUser.id,
+	name: "Project Alpha",
+	description: "Workspace for Project Alpha",
+	slug: "project-alpha",
+	ownerId: newUser.id,
+	subscription: "free",
 });
 
 const secondUserInput: TCreateUserInput = {

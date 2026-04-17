@@ -47,14 +47,15 @@ export class Member implements IMember {
     // Implementation to fetch workspace details by ID
     console.log(`Fetching workspace with ID: ${id}`);
     return {
-      createdAt: new Date(),
-      slug: "mock-workspace",
-      description: "Mock workspace description",
-      id,
-      name: "Mock Workspace",
-      ownerId: "user-123" as unknown as IWorkspaceDTO["ownerId"],
-      updatedAt: new Date(),
-    }
+			createdAt: new Date(),
+			slug: "mock-workspace",
+			description: "Mock workspace description",
+			id,
+			subscription: "free",
+			name: "Mock Workspace",
+			ownerId: "user-123" as unknown as IWorkspaceDTO["ownerId"],
+			updatedAt: new Date(),
+		};
   }
 }
 

@@ -36,11 +36,12 @@ async function main() {
   const workspace = new WorkspaceMemberManager()
 
   const createdWorkspace = await workspace.createWorkspace({
-    name: "Workspace 1",
-    description: "This is the first workspace",
-    ownerId: user_01.id,
-    slug: "workspace-1",
-  })
+		name: "Workspace 1",
+		description: "This is the first workspace",
+		ownerId: user_01.id,
+		slug: "workspace-1",
+		subscription: "free",
+	});
 
   const member = await workspace.listMemberDetails({
     userID: user_01.id,
