@@ -74,7 +74,10 @@ export class MemberStore implements IMemberStore {
   }
 
   async delete(id: TMemberId): Promise<void> {
-    localStorage.splice(localStorage.findIndex(member => member.id === id), 1);
+    const index = localStorage.findIndex(member => member.id === id);
+    if (index !== -1) {
+      localStorage.splice(index, 1);
+    }
     return Promise.resolve();
   }
 
@@ -89,6 +92,7 @@ export class MemberStore implements IMemberStore {
 
     memberToUpdate.name = member.name || memberToUpdate.name;
     memberToUpdate.role = member.role || memberToUpdate.role;
+    memberToUpdate.roleId = member.roleId || memberToUpdate.roleId;
     memberToUpdate.updatedAt = new Date();
     return Promise.resolve();
   }

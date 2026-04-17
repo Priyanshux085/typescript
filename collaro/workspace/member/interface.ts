@@ -1,7 +1,8 @@
 import { IUserDTO } from "@collaro/user";
 import { Input } from "@collaro/utils/omit";
 import { IWorkspaceDTO, TRequestId } from "@collaro/workspace";
-import { BRAND } from "zod";
+import { BRAND } from "@collaro/utils/brand";
+import { IRoleValidationResult, TPermission, TRoleId } from "@collaro/workspace/member/role";
 
 export type TMemberId = BRAND<"MemberId">;
 
@@ -10,7 +11,8 @@ export interface IMemberDTO {
   name: string;
   userId: IUserDTO["id"];
   workspaceId: IWorkspaceDTO["id"];
-  role: 'admin' | 'member' | 'owner';
+  role: string;
+  roleId: TRoleId;
   createdAt: Date;
   updatedAt: Date | null;
 }
@@ -41,6 +43,30 @@ export interface IWorkspaceMemberManager {
   approveJoinRequest(requestId: TRequestId, approvedBy: TMemberId): Promise<IMemberDTO>;
   createWorkspace(workspace: Input<IWorkspaceDTO>): Promise<IWorkspaceDTO>;
   listMembers(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]>;
-  banMember(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<void>;
-  removeMemberFromWorkspace(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<void>;
+  banMember(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId, bannedBy?: TMemberId): Promise<void>;
+  removeMemberFromWorkspace(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId, removedBy?: TMemberId): Promise<void>;
+  changeMemberRole(
+    workspaceId: IWorkspaceDTO["id"],
+    memberId: TMemberId,
+    newRoleId: TRoleId,
+    changedBy: TMemberId
+  ): Promise<void>;
+  bulkAssignRole(
+    workspaceId: IWorkspaceDTO["id"],
+    memberIds: readonly TMemberId[],
+    roleId: TRoleId,
+    assignedBy: TMemberId
+  ): Promise<void>;
+  createCustomRole(
+    workspaceId: IWorkspaceDTO["id"],
+    name: string,
+    permissions: readonly TPermission[],
+    createdBy: TMemberId,
+    options?: { description?: string; parentRoleId?: TRoleId }
+  ): Promise<IRoleValidationResult>;
+  checkMemberPermission(
+    workspaceId: IWorkspaceDTO["id"],
+    memberId: TMemberId,
+    permission: TPermission
+  ): Promise<boolean>;
 }

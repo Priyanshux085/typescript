@@ -1,5 +1,5 @@
 import { TCreateUserInput, User } from "@collaro/user";
-import { WorkspaceMemberManager } from "./index";
+import { WorkspaceMemberManager } from "@collaro/manager";
 import { generateUserName } from "@collaro/utils/generate";
 
 const workspaceMemberManager = new WorkspaceMemberManager();

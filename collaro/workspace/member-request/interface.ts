@@ -1,6 +1,6 @@
 import { IUserDTO } from "@collaro/user";
 import { BRAND } from "@collaro/utils/brand";
-import { IWorkspaceDTO } from "..";
+import { IWorkspaceDTO } from "../interface";
 import { INotificationStore } from "@collaro/notification";
 
 export type TRequestId = BRAND<"RequestId">;
