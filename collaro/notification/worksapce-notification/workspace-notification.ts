@@ -1,5 +1,9 @@
 import { ID } from "@collaro/utils/generate";
-import { INotificationDTO, INotificationStore } from "../interface";
+import {
+	INotification,
+	INotificationDTO,
+	INotificationStore,
+} from "../interface";
 import { notificationStore } from "../notification-store";
 import { IUserDTO } from "@collaro/user";
 import { IWorkspaceDTO } from "@collaro/workspace";
@@ -70,93 +74,140 @@ function MemberNotificationMessage(type: TMemberNotificationType, userName: stri
   }
 }
 
-export class WorkspaceNotification {
-  private static instance: WorkspaceNotification;
-  store: INotificationStore = notificationStore;
-  dto: INotificationDTO = {} as INotificationDTO;
+type ICreateWorkspaceNotificationInput = Omit<
+	IWorkspaceNotificationDTO,
+	"id" | "message" | "createdAt" | "updatedAt" | "read"
+>;
 
-  private constructor() {
-    if (WorkspaceNotification.instance) {
-      throw new Error("Use WorkspaceNotification.getInstance() to get the singleton instance.");
-    }
-  }
+type ICreateMemberNotificationInput = Omit<
+	IMemberNotificationDTO,
+	"id" | "message" | "createdAt" | "updatedAt" | "read"
+>;
 
-  public static getInstance(): WorkspaceNotification {
-    if (!WorkspaceNotification.instance) {
-      WorkspaceNotification.instance = new WorkspaceNotification();
-    }
+export class WorkspaceNotification implements INotification<
+	INotificationDTO,
+	ICreateWorkspaceNotificationInput | ICreateMemberNotificationInput
+> {
+	private static instance: WorkspaceNotification;
+	store: INotificationStore = notificationStore;
+	notification: INotificationDTO = {} as INotificationDTO;
 
-    return WorkspaceNotification.instance;
-  }
+	private constructor() {
+		if (WorkspaceNotification.instance) {
+			throw new Error(
+				"Use WorkspaceNotification.getInstance() to get the singleton instance."
+			);
+		}
+	}
 
-  async createWorkspaceNotification(
-    input: Omit<IWorkspaceNotificationDTO, "id" | "message" | "createdAt" | "updatedAt" | "read">
-  ): Promise<INotificationDTO> {
-    try {
-      const message = WorkspaceNotificationMessage(input.type, input.workspaceName, input.userName) || "";
+	public static getInstance(): WorkspaceNotification {
+		if (!WorkspaceNotification.instance) {
+			WorkspaceNotification.instance = new WorkspaceNotification();
+		}
 
-      const dto: INotificationDTO = {
-        ...input,
-        id: ID.notificationId(),
-        message,
-        read: false,
-        createdAt: new Date(),
-        updatedAt: null,
-      };
-  
-      await this.store.create({...dto});
+		return WorkspaceNotification.instance;
+	}
 
-      return dto;
-    } catch (error: unknown) {
-      console.error("Error creating notification:", error);
-      throw error;
-    }
-  }
+	async createNotification(
+		notification:
+			| ICreateWorkspaceNotificationInput
+			| ICreateMemberNotificationInput
+	): Promise<INotificationDTO> {
+		// if the type is workspace notification, then create a workspace notification, else create a member notification
+		if ("workspaceName" in notification) {
+			return await this.createWorkspaceNotification(
+				notification as ICreateWorkspaceNotificationInput
+			);
+		} else {
+			return await this.createMemberNotification(
+				notification as ICreateMemberNotificationInput
+			);
+		}
+	}
 
-  async createMemberNotification(
-    input: Omit<IMemberNotificationDTO, "id" | "message" | "createdAt" | "updatedAt" | "read">
-  ): Promise<INotificationDTO> {
-    try {
-      const message = MemberNotificationMessage(input.type, input.userName, input.workspaceName) || "";
+	async createWorkspaceNotification(
+		input: ICreateWorkspaceNotificationInput
+	): Promise<INotificationDTO> {
+		try {
+			const message =
+				WorkspaceNotificationMessage(
+					input.type,
+					input.workspaceName,
+					input.userName
+				) || "";
 
-      const dto: INotificationDTO = {
-        ...input,
-        id: ID.notificationId(),
-        message,
-        read: false,
-        createdAt: new Date(),
-        updatedAt: null,
-      };
-  
-      // Save the notification to the store
-      await this.store.create({
-        ...dto
-      })
-  
-      return dto;
-    } catch (error: unknown) {
-      console.error("Error creating member notification:", error);
-      throw error;
-    }
-  }
+			const dto: INotificationDTO = {
+				...input,
+				id: ID.notificationId(),
+				message,
+				read: false,
+				createdAt: new Date(),
+				updatedAt: null,
+			};
 
-  async markAsRead(notificationId: INotificationDTO["id"]): Promise<boolean> {
-    try {
-      return await this.store.markAsRead(notificationId);
-    } catch (error: unknown) {
-      console.error("Error marking notification as read:", error);
-      throw error;
-    }
-  }
+			await this.store.create({ ...dto });
 
-  async listNotifications(userId: INotificationDTO["userId"]): Promise<INotificationDTO[]> {
-    try {
-      return await this.store.queryNotifications({ userId });
-    } catch (error: unknown) {
-      console.error("Error listing notifications:", error);
-      throw error;
-    }
-  }
+			return dto;
+		} catch (error: unknown) {
+			console.error("Error creating notification:", error);
+			throw error;
+		}
+	}
+
+	async createMemberNotification(
+		input: Omit<
+			IMemberNotificationDTO,
+			"id" | "message" | "createdAt" | "updatedAt" | "read"
+		>
+	): Promise<INotificationDTO> {
+		try {
+			const message =
+				MemberNotificationMessage(
+					input.type,
+					input.userName,
+					input.workspaceName
+				) || "";
+
+			const dto: INotificationDTO = {
+				...input,
+				id: ID.notificationId(),
+				message,
+				read: false,
+				createdAt: new Date(),
+				updatedAt: null,
+			};
+
+			// Save the notification to the store
+			await this.store.create({
+				...dto,
+			});
+
+			return dto;
+		} catch (error: unknown) {
+			console.error("Error creating member notification:", error);
+			throw error;
+		}
+	}
+
+	async markAsRead(notificationId: INotificationDTO["id"]): Promise<boolean> {
+		try {
+			return await this.store.markAsRead(notificationId);
+		} catch (error: unknown) {
+			console.error("Error marking notification as read:", error);
+			throw error;
+		}
+	}
+
+	async listNotifications(
+		userId: INotificationDTO["userId"]
+	): Promise<INotificationDTO[]> {
+		try {
+			return await this.store.queryNotifications({ userId });
+		} catch (error: unknown) {
+			console.error("Error listing notifications:", error);
+			throw error;
+		}
+	}
 }
 
 export const workspaceNotification = WorkspaceNotification.getInstance();

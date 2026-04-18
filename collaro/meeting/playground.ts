@@ -1,71 +1,88 @@
-import {
-  // PrivateMeeting,
-  TeamMeeting,
-} from "./index";
-
+import { WorkspaceMeetingManager } from "../manager/workspace-meeting-manager";
+import { WorkspaceMemberManager } from "../manager";
 import { User } from "@collaro/user";
-// import { ID } from "@collaro/utils/generate";
-import { WorkspaceMemberManager } from "@collaro/manager";
 
-async function main() {
+const workspaceManager = new WorkspaceMemberManager();
+const meetingManager = new WorkspaceMeetingManager();
+const user = new User();
 
-  const userService = new User();
-
-  const user_01 = await userService.createUser({
-    email: "john@example.com",
-    name: "John Doe",
-    password: "password123",
-    userName: "john_doe",
-  })
-
-  // Create a private meeting
-  // const privateMeeting = new PrivateMeeting({
-  //   id: ID.meetingId("Private Meeting"),
-  //   title: "Private Meeting",
-  //   description: "This is a private meeting",
-  //   createdAt: new Date(),
-  //   createdBy: user_01.id,
-  //   participants: {
-  //     [String(user_01.id)]: user_01.id
-  //   },
-  //   status: "Ongoing",
-  //   startTime: new Date(),
-  //   endTime: null,
-  // });
-
-  const workspace = new WorkspaceMemberManager()
-
-  const createdWorkspace = await workspace.createWorkspace({
-		name: "Workspace 1",
-		description: "This is the first workspace",
-		ownerId: user_01.id,
-		slug: "workspace-1",
-		subscription: "free",
+async function AvengersMeetingPlayground() {
+	const tony = user.createUser({
+		name: "Tony Stark",
+		email: "tony.stark@example.com",
+		password: "password123",
+		userName: "tony.stark",
 	});
 
-  const member = await workspace.listMemberDetails({
-    userID: user_01.id,
-    workspaceId: createdWorkspace.id,
-  });
+	const steve = user.createUser({
+		name: "Steve Rogers",
+		email: "steve.rogers@avengers.com",
+		password: "password123",
+		userName: "steve.rogers",
+	});
 
-  if (!member) {
-    console.log(`Member with user ID: ${user_01.id} not found in workspace ID: ${createdWorkspace.id}`);
-    return;
-  }
+	const avengersWorkspace = await workspaceManager.createWorkspace({
+		name: "Avengers",
+		description: "Workspace for the Avengers team",
+		ownerId: tony.id,
+		slug: "avengers-workspace",
+		subscription: "enterprise",
+	});
 
-  const teamMeetingInput = new TeamMeeting();
+	const tonyMember = await workspaceManager.listMemberDetails({
+		userID: tony.id,
+		workspaceId: avengersWorkspace.id,
+	});
 
-  const meeting = await teamMeetingInput.createMeeting({
-    workspaceId: createdWorkspace.id,
-    title: "Team Meeting",
-    description: "This is a team meeting",
-    createdBy: member.id,
-    startTime: new Date(),
-    status: "Ongoing",
-    endTime: null
-  })
+	await workspaceManager.requestWorkspace(avengersWorkspace.id, steve.id);
 
-  console.log("Created team meeting:", meeting);
+	const pendingRequests = await workspaceManager.listRequests(
+		avengersWorkspace.id
+	);
+
+	await workspaceManager.approveJoinRequest(
+		pendingRequests[0]!.id,
+		tonyMember!.id
+	);
+
+	const steveMember = await workspaceManager.listMemberDetails({
+		userID: steve.id,
+		workspaceId: avengersWorkspace.id,
+	});
+
+	// Create a meeting in the Avengers workspace
+	const meeting = await meetingManager.createMeeting({
+		createdBy: tonyMember!.id,
+		workspaceId: avengersWorkspace.id,
+		status: "Scheduled",
+		title: "Strategy Meeting",
+		meetingType: "Instant",
+		description: "Discuss strategy for the upcoming mission",
+		startTime: new Date(Date.now() + 60 * 60 * 1000),
+	});
+
+	await meetingManager.joinMeeting(meeting.id, steveMember!.id);
+
+	// console.log("Meeting created successfully in the Avengers workspace!");
+	// user.listNotifications(tony.id).then((notifications) => {
+	// 	console.log(`Notifications for ${tony.name}:`, notifications);
+	// });
+
+	// user.listNotifications(steve.id).then((notifications) => {
+	// 	console.log(`Notifications for ${steve.name}:`, notifications);
+	// });
+
+	meetingManager.listParticipants(meeting.id).then((participants) => {
+		console.log(`Participants in meeting ${meeting.title}:`, participants);
+	});
+
+	meetingManager.getMeeting(meeting.id).then((meetingDetails) => {
+		console.log(`Details of meeting ${meeting.title}:`, meetingDetails);
+	});
 }
 
-main().catch(console.error);
+async function playground() {
+	await AvengersMeetingPlayground();
+}
+
+playground();

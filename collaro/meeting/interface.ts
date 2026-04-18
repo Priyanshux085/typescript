@@ -12,20 +12,25 @@ export enum MeetingType {
   private = "Private Meeting",
 }
 
-export type meetingStatus = "Scheduled" | "Ongoing" | "Completed" | "Cancelled";
+export type meetingStatus =
+	| "Active"
+	| "Not Started"
+	| "Cancelled"
+	| "Completed";
 
-export type TParicipants<T> = Record<string, T>;
+export type TMeeting = "Instant" | "Scheduled";
 
 export interface IMeetingDTO<T> {
-  participants: TParicipants<T>;
-  id: TMeetingId;
-  title: string;
-  createdBy: T;
-  status: meetingStatus;
-  description: string;
-  startTime: Date;
-  endTime: Date | null;
-  createdAt: Date;
+	meetingType: TMeeting;
+	participants: Record<string, string>;
+	id: TMeetingId;
+	title: string;
+	createdBy: T;
+	status: meetingStatus;
+	description: string;
+	startTime: Date;
+	endTime: Date | null;
+	createdAt: Date;
 }
 
 export interface IWorkspaceMeetingDTO extends IMeetingDTO<TMemberId> {

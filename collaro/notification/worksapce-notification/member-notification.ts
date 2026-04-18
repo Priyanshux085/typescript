@@ -20,11 +20,11 @@ export const mapNotificationTypeToMessage = (type: NotificationType): string => 
 };
 
 type CreateNotificationInput = {
-  type: NotificationType;
-  userId: INotificationDTO["userId"];
-  workspaceId: INotificationDTO["workspaceId"];
-  memberID: INotificationDTO["memberID"];
-}
+	type: NotificationType;
+	userId: INotificationDTO["userId"];
+	workspaceId: INotificationDTO["workspaceId"];
+	memberId: INotificationDTO["memberId"];
+};
 
 class WorkspaceMemberNotification {
   private static instance: WorkspaceMemberNotification;
@@ -47,28 +47,17 @@ class WorkspaceMemberNotification {
     const message = mapNotificationTypeToMessage(input.type);
 
     const notification: INotificationDTO = {
-      id: ID.notificationId(),
-      type: input.type,
-      message,
-      userId: input.userId,
-      workspaceId: input.workspaceId,
-      memberID: input.memberID,
-      read: false,
-      createdAt: new Date(),
-      updatedAt: null,
-    };
+			...input,
+			id: ID.notificationId(),
+			message,
+			read: false,
+			createdAt: new Date(),
+			updatedAt: null,
+		};
 
     await this.store.create({
-      id: notification.id,
-      type: notification.type,
-      message: notification.message,
-      userId: notification.userId,
-      workspaceId: notification.workspaceId,
-      memberID: notification.memberID,
-      read: notification.read,
-      createdAt: notification.createdAt,
-      updatedAt: notification.updatedAt,
-    })
+			...notification,
+		});
 
     return Promise.resolve(notification);
   }

@@ -111,7 +111,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			type: "request_approved",
 			userName: user.userName,
 			workspaceName: workspace.name || workspace.slug,
-			memberID: newMember.id,
+			memberId: newMember.id,
 			userId: user.id,
 			workspaceId: workspaceId,
 		});
@@ -122,7 +122,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			userId: workspace.ownerId,
 			workspaceId: workspaceId,
 			workspaceName: workspace.name,
-			memberID: newMember.id,
+			memberId: newMember.id,
 		});
 
 		return newMember;
@@ -191,7 +191,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		await this.notificationService.createWorkspaceNotification({
 			workspaceName: newWorkspace.name,
 			type: "workspace_created",
-			memberID: ownerMember.id,
+			memberId: ownerMember.id,
 			userId: workspace.ownerId,
 			workspaceId: newWorkspace.id,
 		});
@@ -254,7 +254,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			type: "workspace_updated",
 			userId: workspaceDetail.ownerId,
 			workspaceId,
-			memberID: memberId,
+			memberId: member.id,
 			userName: member.name,
 		});
 
@@ -398,12 +398,9 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 				throw new Error(`Workspace with ID: ${workspaceId} not found.`);
 			}
 
-			const list = await this.memberStore.list();
-			const workspaceMembers = list.filter(
-				(member: IMemberDTO) => member.workspaceId === workspaceId
-			);
+			const list = await this.memberStore.list(workspaceId);
 
-			return this.sorting.sortByName(workspaceMembers, "asc");
+			return this.sorting.sortByName(list, "asc");
 		} catch (error) {
 			console.error(
 				`Error fetching members for workspace ID: ${workspaceId}.`,
@@ -465,7 +462,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 		await this.notificationService.createMemberNotification({
 			type: "member_removed",
-			memberID: memberId,
+			memberId,
 			workspaceId,
 			userId: member.userId,
 			userName: member.name,
@@ -486,10 +483,8 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			);
 		}
 
-		const members = await this.memberStore.list();
-		const memberDetails = members.find(
-			(member) => member.userId === userID && member.workspaceId === workspaceId
-		);
+		const members = await this.memberStore.list(workspaceId);
+		const memberDetails = members.find((member) => member.userId === userID);
 
 		if (!memberDetails) {
 			console.log(`Member details for user ID: ${userID} not found.`);

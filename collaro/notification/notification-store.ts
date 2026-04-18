@@ -52,9 +52,9 @@ class NotificationStore implements INotificationStore {
       whereclause.push(`workspaceId: ${query.workspaceId}`);
     }
 
-    if(query.memberID) {
-      whereclause.push(`memberID: ${query.memberID}`);
-    }
+    if (query.memberId) {
+			whereclause.push(`memberId: ${query.memberId}`);
+		}
 
     const filteredNotifications = globalNotifications.filter(notification => {
       if(query.userId && notification.userId !== query.userId) {
@@ -65,9 +65,9 @@ class NotificationStore implements INotificationStore {
         return false;
       }
 
-      if(query.memberID && notification.memberID !== query.memberID) {
-        return false;
-      }
+      if (query.memberId && notification.memberId !== query.memberId) {
+				return false;
+			}
 
       return true;
     });

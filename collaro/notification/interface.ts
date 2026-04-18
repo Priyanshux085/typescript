@@ -11,26 +11,26 @@ export interface INotificationDTO {
 	message: string;
 	userId: IUserDTO["id"];
 	workspaceId: IWorkspaceDTO["id"];
-	memberID?: IMemberDTO["id"];
+	memberId?: IMemberDTO["id"];
 	read: boolean;
 	createdAt: Date;
 	updatedAt: Date | null;
 }
 
-export interface INotification {
-	notification: INotificationDTO;
+export interface INotification<T extends INotificationDTO, TInput> {
+	notification: T;
 
-	createNotification(notification: INotificationDTO): Promise<INotificationDTO>;
+	createNotification(notification: TInput): Promise<INotificationDTO>;
 
 	markAsRead(notificationId: TNotificationId): Promise<boolean>;
 
-	getNotificationsforUser(userId: IUserDTO["id"]): Promise<INotificationDTO[]>;
+	listNotifications(userId: IUserDTO["id"]): Promise<INotificationDTO[]>;
 }
 
 export type GetNotificationQuery = {
 	workspaceId?: IWorkspaceDTO["id"];
 	userId?: IUserDTO["id"];
-	memberID?: IMemberDTO["id"];
+	memberId?: IMemberDTO["id"];
 };
 
 export interface INotificationStore {
