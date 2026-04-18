@@ -1,5 +1,5 @@
 import { TSubscriptionPlan } from "@collaro/subscription";
-import { IWorkspaceDTO } from "../../interface";
+import { IWorkspaceDTO, IWorkspaceStore } from "../../interface";
 import {
 	IBulkRoleAssignmentRequest,
 	IBulkRoleAssignmentResult,
@@ -20,11 +20,9 @@ import {
 	TRoleId,
 } from "./types";
 import { RoleValidator } from "./validator";
-
-function createRoleId(): TRoleId {
-	const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-	return `role_${suffix}` as unknown as TRoleId;
-}
+import { ID } from "@collaro/utils";
+import { MemoryRoleStore } from "./store";
+import { IMemberDTO, MemoryWorkspaceStore } from "..";
 
 function slugifyRoleKey(name: string): string {
 	return name
@@ -34,23 +32,63 @@ function slugifyRoleKey(name: string): string {
 		.replace(/^_+|_+$/g, "");
 }
 
-export class RoleManager implements IRoleManager {
-	constructor(
-		private readonly store: IRoleStore,
-		private readonly subscriptionPlan: TSubscriptionPlan
-	) {}
+const DEFAULT_WORKSPACE_ROLES = [
+	"owner",
+	"admin",
+	"member",
+	"guest",
+] as const satisfies readonly TPredefinedRoleKey[];
 
-	async seedWorkspaceRoles(workspaceId: IWorkspaceDTO["id"]): Promise<IRoleDTO[]> {
-		const seededRoles: IRoleDTO[] = [];
-		for (const roleKey of ["owner", "admin", "member", "guest"] as const) {
+export class RoleManager implements IRoleManager {
+	private readonly WorkspaceRoleMap: Record<string, IRoleDTO> = {};
+	private readonly workspaceStore: IWorkspaceStore =
+		MemoryWorkspaceStore.getInstance();
+	private readonly store: IRoleStore = new MemoryRoleStore();
+	public slug: IWorkspaceDTO["slug"] = "";
+
+	private async fetchSlug(workspaceId: IWorkspaceDTO["id"]): Promise<string> {
+		await this.workspaceStore
+			.findById(workspaceId)
+			.then((workspace) => {
+				if (!workspace) {
+					throw new Error(
+						`Workspace with ID ${String(workspaceId)} not found.`
+					);
+				}
+
+				// Store the slug for role ID generation
+				this.slug = workspace.slug;
+			})
+			.catch((error) => {
+				console.error("Error initializing RoleManager:", error);
+				throw error;
+			});
+
+		return this.slug;
+	}
+
+	constructor(
+		readonly workspaceId: IWorkspaceDTO["id"],
+		private readonly subscriptionPlan: TSubscriptionPlan
+	) {
+		this.fetchSlug(workspaceId).catch((error) => {
+			console.error("Failed to initialize RoleManager:", error);
+		});
+	}
+
+	async seedDefaultWorkspaceRoles(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IRoleDTO[]> {
+		// Seed predefined roles - check if they already exist to avoid duplicates
+		for (const roleKey of DEFAULT_WORKSPACE_ROLES) {
 			const existingRole = await this.store.findByKey(workspaceId, roleKey);
 			if (existingRole) {
-				seededRoles.push(existingRole);
+				this.WorkspaceRoleMap[String(existingRole.id)] = existingRole;
 				continue;
 			}
 
 			const seededRole: IRoleDTO = {
-				id: createRoleId(),
+				id: ID.roleId(this.slug),
 				workspaceId,
 				key: roleKey,
 				name: roleKey.charAt(0).toUpperCase() + roleKey.slice(1),
@@ -63,21 +101,30 @@ export class RoleManager implements IRoleManager {
 			};
 
 			await this.store.save(seededRole);
-			seededRoles.push(seededRole);
+			this.WorkspaceRoleMap[String(seededRole.id)] = seededRole;
 		}
 
-		return seededRoles;
+		return Object.values(this.WorkspaceRoleMap);
 	}
 
 	async createCustomRole(
-		workspaceId: IWorkspaceDTO["id"],
 		name: string,
 		permissions: readonly TPermission[],
-		options?: { description?: string; parentRoleId?: TRoleId }
+		options?: { description?: string; parentRoleId?: TRoleId },
+		workspaceId?: IWorkspaceDTO["id"]
 	): Promise<IRoleValidationResult> {
-		const workspaceRoles = await this.getRolesForWorkspace(workspaceId);
-		const currentCustomRoleCount = workspaceRoles.filter((role) => role.isCustom).length;
-		const planValidation = RoleValidator.canCreateCustomRole(this.subscriptionPlan, currentCustomRoleCount);
+		const workspaceRoles = await this.getRolesForWorkspace(
+			workspaceId || this.workspaceId
+		);
+		const currentCustomRoleCount = workspaceRoles.filter(
+			(role) => role.isCustom
+		).length;
+
+		const planValidation = RoleValidator.canCreateCustomRole(
+			this.subscriptionPlan,
+			currentCustomRoleCount
+		);
+
 		if (!planValidation.success) {
 			return planValidation;
 		}
@@ -91,7 +138,10 @@ export class RoleManager implements IRoleManager {
 			};
 		}
 
-		const existingRole = await this.store.findByKey(workspaceId, roleKey);
+		const existingRole = await this.store.findByKey(
+			workspaceId || this.workspaceId,
+			roleKey
+		);
 		if (existingRole) {
 			return {
 				success: false,
@@ -100,32 +150,45 @@ export class RoleManager implements IRoleManager {
 			};
 		}
 
-		const filteredPermissions = RoleValidator.filterPermissionsForPlan(this.subscriptionPlan, permissions);
+		const filteredPermissions = RoleValidator.filterPermissionsForPlan(
+			this.subscriptionPlan,
+			permissions
+		);
 		if (filteredPermissions.length !== permissions.length) {
 			return {
 				success: false,
 				code: ROLE_ERROR_CODES.INVALID_PERMISSION,
-				message: "One or more permissions are not allowed on this subscription plan.",
+				message:
+					"One or more permissions are not allowed on this subscription plan.",
 			};
 		}
 
-		const roleId = createRoleId();
+		const roleId = ID.roleId(this.slug);
 		const parentRoleId = options?.parentRoleId ?? null;
 		if (parentRoleId) {
-			const inheritanceValidation = RoleValidator.validateInheritance(roleId, parentRoleId, workspaceRoles);
+			const inheritanceValidation = RoleValidator.validateInheritance(
+				roleId,
+				parentRoleId,
+				workspaceRoles
+			);
 			if (!inheritanceValidation.success) {
 				return {
 					success: false,
 					code: inheritanceValidation.code,
 					message: inheritanceValidation.message,
-					errors: [{ field: "parentRoleId", message: inheritanceValidation.message || "Invalid inheritance." }],
+					errors: [
+						{
+							field: "parentRoleId",
+							message: inheritanceValidation.message || "Invalid inheritance.",
+						},
+					],
 				};
 			}
 		}
 
 		const role: IRoleDTO = {
 			id: roleId,
-			workspaceId,
+			workspaceId: workspaceId || this.workspaceId,
 			key: roleKey,
 			name,
 			description: options?.description,
@@ -142,7 +205,9 @@ export class RoleManager implements IRoleManager {
 
 	async updateCustomRole(
 		roleId: TRoleId,
-		updates: Partial<Pick<IRoleDTO, "name" | "description" | "permissions" | "parentRoleId">>
+		updates: Partial<
+			Pick<IRoleDTO, "name" | "description" | "permissions" | "parentRoleId">
+		>
 	): Promise<IRoleValidationResult> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
@@ -162,26 +227,42 @@ export class RoleManager implements IRoleManager {
 		}
 
 		const nextPermissions = updates.permissions
-			? RoleValidator.filterPermissionsForPlan(this.subscriptionPlan, updates.permissions)
+			? RoleValidator.filterPermissionsForPlan(
+					this.subscriptionPlan,
+					updates.permissions
+				)
 			: role.permissions;
 
-		if (updates.permissions && nextPermissions.length !== updates.permissions.length) {
+		if (
+			updates.permissions &&
+			nextPermissions.length !== updates.permissions.length
+		) {
 			return {
 				success: false,
 				code: ROLE_ERROR_CODES.INVALID_PERMISSION,
-				message: "One or more permissions are not allowed on this subscription plan.",
+				message:
+					"One or more permissions are not allowed on this subscription plan.",
 			};
 		}
 
 		if (updates.parentRoleId) {
 			const workspaceRoles = await this.getRolesForWorkspace(role.workspaceId);
-			const validation = RoleValidator.validateInheritance(role.id, updates.parentRoleId, workspaceRoles);
+			const validation = RoleValidator.validateInheritance(
+				role.id,
+				updates.parentRoleId,
+				workspaceRoles
+			);
 			if (!validation.success) {
 				return {
 					success: false,
 					code: validation.code,
 					message: validation.message,
-					errors: [{ field: "parentRoleId", message: validation.message || "Invalid inheritance." }],
+					errors: [
+						{
+							field: "parentRoleId",
+							message: validation.message || "Invalid inheritance.",
+						},
+					],
 				};
 			}
 		}
@@ -210,7 +291,10 @@ export class RoleManager implements IRoleManager {
 		const assignments = await this.store.listAssignments(role.workspaceId);
 		for (const assignment of assignments) {
 			if (assignment.roleId === roleId) {
-				await this.store.removeMemberRole(assignment.memberId, assignment.workspaceId);
+				await this.store.removeMemberRole(
+					assignment.memberId,
+					assignment.workspaceId
+				);
 			}
 		}
 
@@ -221,20 +305,31 @@ export class RoleManager implements IRoleManager {
 		return this.store.findById(roleId);
 	}
 
-	async getRoleByKey(workspaceId: IWorkspaceDTO["id"], key: string): Promise<IRoleDTO | null> {
+	async getRoleByKey(
+		workspaceId: IWorkspaceDTO["id"],
+		key: string
+	): Promise<IRoleDTO | null> {
 		return this.store.findByKey(workspaceId, key);
 	}
 
-	async getRolesForWorkspace(workspaceId: IWorkspaceDTO["id"]): Promise<IRoleDTO[]> {
+	async getRolesForWorkspace(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IRoleDTO[]> {
 		return this.store.findByWorkspace(workspaceId);
 	}
 
-	async getPredefinedRole(workspaceId: IWorkspaceDTO["id"], key: TPredefinedRoleKey): Promise<IRoleDTO | null> {
-		await this.seedWorkspaceRoles(workspaceId);
+	async getPredefinedRole(
+		workspaceId: IWorkspaceDTO["id"],
+		key: TPredefinedRoleKey
+	): Promise<IRoleDTO | null> {
+		await this.seedDefaultWorkspaceRoles(workspaceId);
 		return this.store.findByKey(workspaceId, key);
 	}
 
-	async hasPermission(roleId: TRoleId, permission: TPermission): Promise<IPermissionValidationResult> {
+	async hasPermission(
+		roleId: TRoleId,
+		permission: TPermission
+	): Promise<IPermissionValidationResult> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
 			return {
@@ -248,7 +343,10 @@ export class RoleManager implements IRoleManager {
 		return RoleValidator.hasPermission(role, permission, allRoles);
 	}
 
-	async hasAnyPermission(roleId: TRoleId, permissions: readonly TPermission[]): Promise<boolean> {
+	async hasAnyPermission(
+		roleId: TRoleId,
+		permissions: readonly TPermission[]
+	): Promise<boolean> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
 			return false;
@@ -258,7 +356,10 @@ export class RoleManager implements IRoleManager {
 		return RoleValidator.hasAnyPermission(role, permissions, allRoles);
 	}
 
-	async hasAllPermissions(roleId: TRoleId, permissions: readonly TPermission[]): Promise<boolean> {
+	async hasAllPermissions(
+		roleId: TRoleId,
+		permissions: readonly TPermission[]
+	): Promise<boolean> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
 			return false;
@@ -268,7 +369,12 @@ export class RoleManager implements IRoleManager {
 		return RoleValidator.hasAllPermissions(role, permissions, allRoles);
 	}
 
-	async assignRoleToMember(memberId: string, workspaceId: IWorkspaceDTO["id"], roleId: TRoleId, assignedBy: string): Promise<void> {
+	async assignRoleToMember(
+		memberId: IMemberDTO["id"],
+		workspaceId: IWorkspaceDTO["id"],
+		roleId: TRoleId,
+		assignedBy: string
+	): Promise<void> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
 			throw new Error(`Role with ID ${String(roleId)} not found.`);
@@ -289,8 +395,14 @@ export class RoleManager implements IRoleManager {
 		await this.store.assignRole(assignment);
 	}
 
-	async getMemberRole(memberId: string, workspaceId: IWorkspaceDTO["id"]): Promise<IRoleDTO | null> {
-		const assignment = await this.store.getMemberRoleAssignment(memberId, workspaceId);
+	async getMemberRole(
+		memberId: IMemberDTO["id"],
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IRoleDTO | null> {
+		const assignment = await this.store.getMemberRoleAssignment(
+			memberId,
+			workspaceId
+		);
 		if (!assignment) {
 			return null;
 		}
@@ -298,13 +410,18 @@ export class RoleManager implements IRoleManager {
 		return this.store.findById(assignment.roleId);
 	}
 
-	async bulkAssignRole(request: IBulkRoleAssignmentRequest): Promise<IBulkRoleAssignmentResult> {
-		if (!ROLE_LIMITS_BY_SUBSCRIPTION[this.subscriptionPlan].canUseBulkOperations) {
+	async bulkAssignRole(
+		request: IBulkRoleAssignmentRequest
+	): Promise<IBulkRoleAssignmentResult> {
+		if (
+			!ROLE_LIMITS_BY_SUBSCRIPTION[this.subscriptionPlan].canUseBulkOperations
+		) {
 			return {
 				successful: [],
 				failed: request.memberIds.map((memberId) => ({
 					memberId,
-					message: "Bulk operations are not available on this subscription plan.",
+					message:
+						"Bulk operations are not available on this subscription plan.",
 					code: ROLE_ERROR_CODES.PLAN_LIMIT_EXCEEDED,
 				})),
 				totalCount: request.memberIds.length,
@@ -313,12 +430,21 @@ export class RoleManager implements IRoleManager {
 			};
 		}
 
-		const successful: string[] = [];
-		const failed: { memberId: string; message: string; code: string }[] = [];
+		const successful: IMemberDTO["id"][] = [];
+		const failed: {
+			memberId: IMemberDTO["id"];
+			message: string;
+			code: string;
+		}[] = [];
 
 		for (const memberId of request.memberIds) {
 			try {
-				await this.assignRoleToMember(memberId, request.workspaceId, request.roleId, request.assignedBy);
+				await this.assignRoleToMember(
+					memberId,
+					request.workspaceId,
+					request.roleId,
+					request.assignedBy
+				);
 				successful.push(memberId);
 			} catch (error) {
 				failed.push({
@@ -338,8 +464,12 @@ export class RoleManager implements IRoleManager {
 		};
 	}
 
-	async bulkUpdateRoles(request: IBulkRoleUpdateRequest): Promise<IRoleValidationResult[]> {
-		if (!ROLE_LIMITS_BY_SUBSCRIPTION[this.subscriptionPlan].canUseBulkOperations) {
+	async bulkUpdateRoles(
+		request: IBulkRoleUpdateRequest
+	): Promise<IRoleValidationResult[]> {
+		if (
+			!ROLE_LIMITS_BY_SUBSCRIPTION[this.subscriptionPlan].canUseBulkOperations
+		) {
 			return request.roleIds.map(() => ({
 				success: false,
 				code: ROLE_ERROR_CODES.PLAN_LIMIT_EXCEEDED,
@@ -351,12 +481,20 @@ export class RoleManager implements IRoleManager {
 		for (const roleId of request.roleIds) {
 			const role = await this.store.findById(roleId);
 			if (!role) {
-				results.push({ success: false, code: ROLE_ERROR_CODES.ROLE_NOT_FOUND, message: "Role not found." });
+				results.push({
+					success: false,
+					code: ROLE_ERROR_CODES.ROLE_NOT_FOUND,
+					message: "Role not found.",
+				});
 				continue;
 			}
 
 			if (!role.isCustom) {
-				results.push({ success: false, code: ROLE_ERROR_CODES.CANNOT_MODIFY_PREDEFINED, message: "Predefined roles cannot be modified." });
+				results.push({
+					success: false,
+					code: ROLE_ERROR_CODES.CANNOT_MODIFY_PREDEFINED,
+					message: "Predefined roles cannot be modified.",
+				});
 				continue;
 			}
 
@@ -374,8 +512,12 @@ export class RoleManager implements IRoleManager {
 	}
 
 	async bulkDeleteRoles(request: IBulkRoleDeleteRequest): Promise<void> {
-		if (!ROLE_LIMITS_BY_SUBSCRIPTION[this.subscriptionPlan].canUseBulkOperations) {
-			throw new Error("Bulk operations are not available on this subscription plan.");
+		if (
+			!ROLE_LIMITS_BY_SUBSCRIPTION[this.subscriptionPlan].canUseBulkOperations
+		) {
+			throw new Error(
+				"Bulk operations are not available on this subscription plan."
+			);
 		}
 
 		for (const roleId of request.roleIds) {
@@ -391,9 +533,17 @@ export class RoleManager implements IRoleManager {
 				}
 
 				if (request.fallbackRoleId) {
-					await this.assignRoleToMember(assignment.memberId, request.workspaceId, request.fallbackRoleId, assignment.assignedBy);
+					await this.assignRoleToMember(
+						assignment.memberId,
+						request.workspaceId,
+						request.fallbackRoleId,
+						assignment.assignedBy
+					);
 				} else {
-					await this.store.removeMemberRole(assignment.memberId, request.workspaceId);
+					await this.store.removeMemberRole(
+						assignment.memberId,
+						request.workspaceId
+					);
 				}
 			}
 
@@ -401,7 +551,10 @@ export class RoleManager implements IRoleManager {
 		}
 	}
 
-	async validateInheritance(roleId: TRoleId, parentRoleId: TRoleId): Promise<IInheritanceValidationResult> {
+	async validateInheritance(
+		roleId: TRoleId,
+		parentRoleId: TRoleId
+	): Promise<IInheritanceValidationResult> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
 			return {
@@ -414,7 +567,11 @@ export class RoleManager implements IRoleManager {
 		}
 
 		const workspaceRoles = await this.store.findByWorkspace(role.workspaceId);
-		return RoleValidator.validateInheritance(roleId, parentRoleId, workspaceRoles);
+		return RoleValidator.validateInheritance(
+			roleId,
+			parentRoleId,
+			workspaceRoles
+		);
 	}
 
 	async computeAllPermissions(role: IRoleDTO): Promise<readonly TPermission[]> {

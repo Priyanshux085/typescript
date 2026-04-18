@@ -33,17 +33,20 @@ import {
 import { RequestMember } from "../workspace/member-request/class";
 
 export class WorkspaceMemberManager implements IWorkspaceMemberManager {
+	private workspaceStore: IWorkspaceStore = MemoryWorkspaceStore.getInstance();
 	private memberStore: IMemberStore = new MemberStore();
-	private workspaceStore: IWorkspaceStore = new MemoryWorkspaceStore();
+	private roleStore = new MemoryRoleStore();
 	private notificationService: WorkspaceNotification = workspaceNotification;
 	private requestService: IRequestMember = new RequestMember();
 	private user: IUser = new User();
-	private roleStore = new MemoryRoleStore();
 
 	private sorting = new MemberSorting();
 
-	private getRoleManager(subscription: TSubscriptionPlan): RoleManager {
-		return new RoleManager(this.roleStore, subscription);
+	private getRoleManager(
+		workspaceId: IWorkspaceDTO["id"],
+		subscription: TSubscriptionPlan
+	): RoleManager {
+		return new RoleManager(workspaceId, subscription);
 	}
 
 	private async joinWorkspace(
@@ -70,8 +73,11 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			currentMemberCount: currentMembers.length,
 		});
 
-		const roleManager = this.getRoleManager(workspace.subscription);
-		await roleManager.seedWorkspaceRoles(workspaceId);
+		const roleManager = this.getRoleManager(
+			workspaceId,
+			workspace.subscription
+		);
+		await roleManager.seedDefaultWorkspaceRoles(workspaceId);
 		const memberRole = await roleManager.getPredefinedRole(
 			workspaceId,
 			"member"
@@ -95,7 +101,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 		await this.memberStore.save(newMember);
 		await roleManager.assignRoleToMember(
-			String(newMember.id),
+			newMember.id,
 			workspaceId,
 			memberRole.id,
 			"system"
@@ -149,8 +155,12 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 		await this.workspaceStore.save(newWorkspace);
 
-		const roleManager = this.getRoleManager(newWorkspace.subscription);
-		await roleManager.seedWorkspaceRoles(newWorkspace.id);
+		const roleManager = this.getRoleManager(
+			newWorkspace.id,
+			newWorkspace.subscription
+		);
+
+		await roleManager.seedDefaultWorkspaceRoles(newWorkspace.id);
 		const ownerRole = await roleManager.getPredefinedRole(
 			newWorkspace.id,
 			"owner"
@@ -163,7 +173,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			userId: workspace.ownerId,
 			id: ID.memberId(),
 			workspaceId: newWorkspace.id,
-			name: `${user.name} Owner`,
+			name: `${user.name}`,
 			role: ownerRole.key,
 			roleId: ownerRole.id,
 			createdAt: new Date(),
@@ -172,7 +182,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 		await this.memberStore.save(ownerMember);
 		await roleManager.assignRoleToMember(
-			String(ownerMember.id),
+			ownerMember.id,
 			newWorkspace.id,
 			ownerRole.id,
 			"system"
@@ -216,7 +226,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			throw new Error("Member not found.");
 		}
 
-		const roleManager = this.getRoleManager(workspaceDetail.subscription);
+		const roleManager = this.getRoleManager(
+			workspaceDetail.id,
+			workspaceDetail.subscription
+		);
 		const canUpdate = await roleManager.hasPermission(
 			member.roleId,
 			"edit_settings:workspace"
@@ -274,7 +287,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 				throw new Error("Approver or workspace not found.");
 			}
 
-			const roleManager = this.getRoleManager(workspace.subscription);
+			const roleManager = this.getRoleManager(
+				workspace.id,
+				workspace.subscription
+			);
 			const canManage = await roleManager.hasPermission(
 				approverDetails.roleId,
 				"manage_roles:workspace"
@@ -330,7 +346,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 				throw new Error("Rejector or workspace not found.");
 			}
 
-			const roleManager = this.getRoleManager(workspace.subscription);
+			const roleManager = this.getRoleManager(
+				workspace.id,
+				workspace.subscription
+			);
 			const canManage = await roleManager.hasPermission(
 				rejectorDetails.roleId,
 				"manage_roles:workspace"
@@ -415,11 +434,11 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			throw new Error("Member or workspace not found.");
 		}
 
-		const roleManager = this.getRoleManager(workspace.subscription);
-		const targetRole = await roleManager.getMemberRole(
-			String(memberId),
-			workspaceId
+		const roleManager = this.getRoleManager(
+			workspace.id,
+			workspace.subscription
 		);
+		const targetRole = await roleManager.getMemberRole(memberId, workspaceId);
 		if (targetRole?.key === "owner") {
 			throw new Error("Workspace owner cannot be removed.");
 		}
@@ -441,7 +460,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			}
 		}
 
-		await this.roleStore.removeMemberRole(String(memberId), workspaceId);
+		await this.roleStore.removeMemberRole(memberId, workspaceId);
 		await this.memberStore.delete(memberId);
 
 		await this.notificationService.createMemberNotification({
@@ -546,7 +565,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			throw new Error("Member not found.");
 		}
 
-		const roleManager = this.getRoleManager(workspace.subscription);
+		const roleManager = this.getRoleManager(
+			workspace.id,
+			workspace.subscription
+		);
 		const permission = await roleManager.hasPermission(
 			actor.roleId,
 			"manage_roles:workspace"
@@ -576,7 +598,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		});
 
 		await roleManager.assignRoleToMember(
-			String(memberId),
+			memberId,
 			workspaceId,
 			nextRole.id,
 			String(changedBy)
@@ -605,7 +627,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			throw new Error("Requester not found.");
 		}
 
-		const roleManager = this.getRoleManager(workspace.subscription);
+		const roleManager = this.getRoleManager(
+			workspace.id,
+			workspace.subscription
+		);
 		const permission = await roleManager.hasPermission(
 			actor.roleId,
 			"manage_roles:workspace"
@@ -633,7 +658,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 		const result = await roleManager.bulkAssignRole({
 			workspaceId,
-			memberIds: memberIds.map((id) => String(id)),
+			memberIds: memberIds.map((id) => id),
 			roleId,
 			assignedBy: String(assignedBy),
 		});
@@ -688,7 +713,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			};
 		}
 
-		const roleManager = this.getRoleManager(workspace.subscription);
+		const roleManager = this.getRoleManager(
+			workspace.id,
+			workspace.subscription
+		);
 		const permission = await roleManager.hasPermission(
 			creator.roleId,
 			"manage_roles:workspace"
@@ -704,10 +732,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		}
 
 		return roleManager.createCustomRole(
-			workspaceId,
 			name,
 			permissions,
-			options
+			options,
+			workspaceId
 		);
 	}
 
@@ -726,7 +754,10 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			return false;
 		}
 
-		const roleManager = this.getRoleManager(workspace.subscription);
+		const roleManager = this.getRoleManager(
+			workspace.id,
+			workspace.subscription
+		);
 		const result = await roleManager.hasPermission(member.roleId, permission);
 		return result.hasPermission;
 	}

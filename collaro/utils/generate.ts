@@ -55,8 +55,8 @@ export class ID {
 		return result as unknown as TRequestId;
 	}
 
-	static roleId(): TRoleId {
-		const prefix = "rol_";
+	static roleId(wSlug: string): TRoleId {
+		const prefix = `rle_${wSlug.slice(0, 8)}_`;
 		const id = generateId<TRoleId>();
 		const result = `${prefix}${id}`.slice(0, 32);
 		return result as unknown as TRoleId;
