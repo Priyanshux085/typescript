@@ -8,7 +8,7 @@ import {
 
 export class Workspace implements IWorkspace {
 	workspace: IWorkspaceDTO = {} as IWorkspaceDTO;
-	store: IWorkspaceStore = new MemoryWorkspaceStore();
+	store: IWorkspaceStore = MemoryWorkspaceStore.getInstance();
 
 	async createWorkspace(
 		workspace: Omit<IWorkspaceDTO, "id" | "subscription">,

@@ -7,9 +7,9 @@ import { randomUUIDv7 } from "bun";
 import { TRoleId } from "..";
 
 function generateId<T>(): T {
-  const createdAt = new Date().getTime();
-  const str = randomUUIDv7("hex", createdAt);
-  return str as unknown as T;
+	const createdAt = new Date().getTime();
+	const str = randomUUIDv7("hex", createdAt);
+	return str as unknown as T;
 }
 
 export class ID {
@@ -64,9 +64,13 @@ export class ID {
 }
 
 export function generateWorkspaceSlug(input: string): string {
-  return input.toLowerCase().replace(/\s+/g, '-');
+	return input.toLowerCase().replace(/\s+/g, "-");
 }
 
 export function generateUserName(input: string): string {
-  return input.toLowerCase().replace(/\s+/g, '');
+	return input.toLowerCase().replace(/\s+/g, "");
+}
+
+export function createMeetingLink(meetingId: TMeetingId): string {
+	return `https://collaro.com/meetings/${meetingId}`;
 }

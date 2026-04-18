@@ -62,43 +62,51 @@ export class Member implements IMember {
 const localStorage: IMemberDTO[] = [];
 
 export class MemberStore implements IMemberStore {
-  async save(member: IMemberDTO): Promise<void> {
-    localStorage.push(member);
-    return Promise.resolve();
-  }
+	async save(member: IMemberDTO): Promise<void> {
+		localStorage.push(member);
+		return Promise.resolve();
+	}
 
-  async findById(id: TMemberId): Promise<IMemberDTO | null> {    
-    const member = localStorage.find(member => member.id === id);
+	async findById(id: TMemberId): Promise<IMemberDTO | null> {
+		const member = localStorage.find((member) => member.id === id);
 
-    return Promise.resolve(member ?? null);
-  }
+		return Promise.resolve(member ?? null);
+	}
 
-  async delete(id: TMemberId): Promise<void> {
-    const index = localStorage.findIndex(member => member.id === id);
-    if (index !== -1) {
-      localStorage.splice(index, 1);
-    }
-    return Promise.resolve();
-  }
+	async delete(id: TMemberId): Promise<void> {
+		const index = localStorage.findIndex((member) => member.id === id);
+		if (index !== -1) {
+			localStorage.splice(index, 1);
+		}
+		return Promise.resolve();
+	}
 
-  async list(): Promise<IMemberDTO[]> {
-    return Promise.resolve(localStorage);
-  }
+	async list(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]> {
+		return Promise.resolve(
+			localStorage.filter((member) => member.workspaceId === workspaceId)
+		);
+	}
 
-  async update(id: TMemberId, member: Partial<IMemberDTO>): Promise<void> {
-    const memberToUpdate = await this.findById(id);
+	async update(id: TMemberId, member: Partial<IMemberDTO>): Promise<void> {
+		const memberToUpdate = await this.findById(id);
 
-    if (!memberToUpdate) throw new Error(`Member with ID: ${id} not found. Cannot update.`);
+		if (!memberToUpdate)
+			throw new Error(`Member with ID: ${id} not found. Cannot update.`);
 
-    memberToUpdate.name = member.name || memberToUpdate.name;
-    memberToUpdate.role = member.role || memberToUpdate.role;
-    memberToUpdate.roleId = member.roleId || memberToUpdate.roleId;
-    memberToUpdate.updatedAt = new Date();
-    return Promise.resolve();
-  }
+		memberToUpdate.name = member.name || memberToUpdate.name;
+		memberToUpdate.role = member.role || memberToUpdate.role;
+		memberToUpdate.roleId = member.roleId || memberToUpdate.roleId;
+		memberToUpdate.updatedAt = new Date();
+		return Promise.resolve();
+	}
 
-  async checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<boolean> {
-    const memberExists = localStorage.some(member => member.id === memberId && member.workspaceId === workspaceId);
-    return Promise.resolve(memberExists);
-  }
+	async checkMemberExists(
+		workspaceId: IWorkspaceDTO["id"],
+		memberId: TMemberId
+	): Promise<boolean> {
+		const memberExists = localStorage.some(
+			(member) => member.id === memberId && member.workspaceId === workspaceId
+		);
+		return Promise.resolve(memberExists);
+	}
 }

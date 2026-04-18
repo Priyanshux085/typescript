@@ -31,12 +31,15 @@ export interface IMember {
 }
 
 export interface IMemberStore {
-  save(member: IMemberDTO): Promise<void>;
-  findById(id: TMemberId): Promise<IMemberDTO | null>;
-  update(id: TMemberId, member: Partial<IMemberDTO>): Promise<void>;
-  delete(id: TMemberId): Promise<void>;
-  list(): Promise<IMemberDTO[]>;
-  checkMemberExists(workspaceId: IWorkspaceDTO["id"], memberId: TMemberId): Promise<boolean>;
+	save(member: IMemberDTO): Promise<void>;
+	findById(id: TMemberId): Promise<IMemberDTO | null>;
+	update(id: TMemberId, member: Partial<IMemberDTO>): Promise<void>;
+	delete(id: TMemberId): Promise<void>;
+	list(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]>;
+	checkMemberExists(
+		workspaceId: IWorkspaceDTO["id"],
+		memberId: TMemberId
+	): Promise<boolean>;
 }
 
 export interface IWorkspaceMemberManager {
