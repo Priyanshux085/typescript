@@ -280,6 +280,13 @@ export interface IRoleAssignmentStore {
 
 export type TWorkspaceRoleMap = Map<string, IRoleDTO["name"]>;
 
+export type TCreateCustomRoleParams = {
+	approvedBy: IMemberDTO["id"];
+	name: string;
+	permissions: readonly TPermission[];
+	options?: { description?: string; parentRoleId?: TRoleId };
+};
+
 export interface IWorkspaceRoleManager {
 	/**
 	 * The role store is responsible for managing role definitions within a workspace,
@@ -292,7 +299,7 @@ export interface IWorkspaceRoleManager {
 	 * It provides methods to save, retrieve, and remove role assignments, as well as to list all assignments for a given workspace.
 	 */
 	roleAssignmentStore: IRoleAssignmentStore;
-	
+
 	/**
 	 * The ID of the workspace that the role manager is operating within.
 	 * This is used to scope all role management operations to a specific workspace, ensuring that roles are created, updated, and assigned within the context of the correct workspace.
@@ -303,7 +310,9 @@ export interface IWorkspaceRoleManager {
 	 * Lists all role assignments for a given workspace.
 	 * @param workspaceId The ID of the workspace to manage roles for.
 	 */
-	listAssignments(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberRoleAssignmentDTO[]>;
+	listAssignments(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IMemberRoleAssignmentDTO[]>;
 
 	/**
 	 * Seeds the workspace with predefined roles based on the subscription plan.
@@ -324,11 +333,12 @@ export interface IWorkspaceRoleManager {
 	 * @throws An error if the operation fails due to permission issues, validation errors, or subscription limits.
 	 * @remarks Custom roles allow for tailored permission sets beyond predefined roles, enabling granular access control within the workspace.
 	 */
-	createCustomRole(
-		name: string,
-		permissions: readonly TPermission[],
-		options?: { description?: string; parentRoleId?: TRoleId },
-	): Promise<IRoleValidationResult>;
+	createCustomRole({
+		approvedBy,
+		name,
+		permissions,
+		options,
+	}: TCreateCustomRoleParams): Promise<IRoleValidationResult>;
 
 	/**
 	 * Updates an existing custom role with new details or permissions.
@@ -364,9 +374,7 @@ export interface IWorkspaceRoleManager {
 	 * @param workspaceId
 	 * @param key
 	 */
-	getRoleByID(
-		roleId: TRoleId
-	): Promise<IRoleDTO | null>;
+	getRoleByID(roleId: TRoleId): Promise<IRoleDTO | null>;
 
 	/**
 	 * Gets all roles defined for a specific workspace, including both predefined and custom roles.
@@ -439,9 +447,7 @@ export interface IWorkspaceRoleManager {
 	 * @param memberId The ID of the member to retrieve the role for.
 	 * @param workspaceId The ID of the workspace where the role is assigned.
 	 */
-	getMemberRole(
-		memberId: IMemberDTO["id"],
-	): Promise<IRoleDTO | null>;
+	getMemberRole(memberId: IMemberDTO["id"]): Promise<IRoleDTO | null>;
 
 	// /**
 	//  * Assigns roles to multiple members within a workspace.

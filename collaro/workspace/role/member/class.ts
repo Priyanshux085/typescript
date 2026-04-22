@@ -93,9 +93,13 @@ export class MemberStore implements IMemberStore {
 		if (!memberToUpdate)
 			throw new Error(`Member with ID: ${id} not found. Cannot update.`);
 
+		if (member.role && member.role === "owner") {
+			throw new Error("Cannot change role to 'owner'. This role is reserved.");
+		}
+
 		memberToUpdate.name = member.name || memberToUpdate.name;
 		memberToUpdate.role = member.role || memberToUpdate.role;
-		memberToUpdate.roleId = member.roleId || memberToUpdate.roleId;
+		memberToUpdate.role = member.role || memberToUpdate.role;
 		memberToUpdate.updatedAt = new Date();
 		return Promise.resolve();
 	}

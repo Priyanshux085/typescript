@@ -1,4 +1,4 @@
-import { IMember, Member } from "@collaro/workspace/member";
+import { IMemberDTO } from "@collaro/workspace/role/member";
 import { TMeetingId } from "../interface";
 import { IParticipantDTO, IParticipantStore } from "./index";
 import { Input } from "@collaro/utils/omit";
@@ -6,7 +6,7 @@ import { Input } from "@collaro/utils/omit";
 const localStorage: IParticipantDTO[] = [];
 
 export class ParticipantStore implements IParticipantStore {
-	member: IMember = new Member();
+	member: IMemberDTO = {} as IMemberDTO;
 
 	async addParticipant(participant: Input<IParticipantDTO>): Promise<void> {
 		const member: IParticipantDTO = {

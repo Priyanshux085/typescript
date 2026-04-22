@@ -1,4 +1,4 @@
-import { IMemberDTO } from "@collaro/workspace/member";
+import { IMemberDTO } from "@collaro/workspace/role/member";
 import { IUserDTO } from "@collaro/user";
 import { BRAND } from "@collaro/utils/brand";
 import { IWorkspaceDTO } from "@collaro/workspace";
@@ -14,7 +14,6 @@ export interface INotificationDTO {
 	memberId?: IMemberDTO["id"];
 	read: boolean;
 	createdAt: Date;
-	updatedAt: Date | null;
 }
 
 export interface INotification<T extends INotificationDTO, TInput> {

@@ -62,13 +62,12 @@ export class MeetingNotification implements IMeetingNotification {
     const notifacationMessage = mapNotificationTypeToMessage(notification.type, notification.meetingLink, notificationMeetingDate);
 
     return await this.store.create({
-      ...notification,
-      id: notifacationId,
-      message: notifacationMessage,
-      read: false,
-      createdAt: notificationMeetingDate,
-      updatedAt: null,
-    })
+			...notification,
+			id: notifacationId,
+			message: notifacationMessage,
+			read: false,
+			createdAt: notificationMeetingDate,
+		});
   }
 
   async listNotifications(userId: IUserDTO["id"]): Promise<INotificationDTO[]> {

@@ -2,7 +2,7 @@ import { TWorkspaceId } from "../workspace";
 import { BRAND } from "@collaro/utils/brand";
 import { Input } from "@collaro/utils/omit";
 import { IParticipantStore } from "./stores";
-import { TMemberId } from "@collaro/workspace/member";
+import { TMemberId } from "@collaro/workspace/role/member";
 
 export type TMeetingId = BRAND<"MeetingId">;
 export type { TWorkspaceId };
@@ -12,11 +12,7 @@ export enum MeetingType {
   private = "Private Meeting",
 }
 
-export type meetingStatus =
-	| "Active"
-	| "Not Started"
-	| "Cancelled"
-	| "Completed";
+export type meetingStatus = "Active" | "Not Started" | "Cancelled" | "Ended";
 
 export type TMeeting = "Instant" | "Scheduled";
 

@@ -11,12 +11,18 @@ import {
 
 export type TMemberId = BRAND<"MemberId">;
 
+export type TRole = "owner" | "admin" | "member";
+export type TOwnerRole = "owner";
+export type TRequestRole = "member";
+export type TChangeableRole = Exclude<TRole, "owner">;
+
 export interface IMemberDTO {
 	id: TMemberId;
 	name: string;
 	userId: IUserDTO["id"];
 	workspaceId: IWorkspaceDTO["id"];
-	roleId: IRoleDTO["id"];
+	// roleId: IRoleDTO["id"];
+	role: TRole;
 	createdAt: Date;
 	updatedAt: Date | null;
 }

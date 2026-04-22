@@ -52,7 +52,6 @@ class WorkspaceMemberNotification {
 			message,
 			read: false,
 			createdAt: new Date(),
-			updatedAt: null,
 		};
 
     await this.store.create({

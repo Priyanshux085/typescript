@@ -3,6 +3,7 @@ import {
 	IParticipantDTO,
 	IParticipantStore,
 	IWorkspaceMeetingDTO,
+	meetingStatus,
 	MemoryWorkspaceMeetingStore,
 	ParticipantStore,
 	TeamMeetingDTO,
@@ -13,7 +14,7 @@ import {
 	IMemberStore,
 	MemberStore,
 	TMemberId,
-} from "@collaro/workspace/member";
+} from "@collaro/workspace/role/member";
 import { createMeetingLink, ID } from "@collaro/utils/generate";
 import { Input } from "@collaro/utils/omit";
 import { MeetingNotification } from "@collaro/notification/meeting-notification/meeting.notification";
@@ -25,10 +26,10 @@ type TBaseCreateMeetingInput = Omit<
 
 type TCreateMeetingInput =
 	| (TBaseCreateMeetingInput & {
-			readonly status: "Instant";
+			readonly meetingType: "Instant";
 	  })
 	| (TBaseCreateMeetingInput & {
-			readonly status: "Scheduled";
+			readonly meetingType: "Scheduled";
 			readonly startTime: Date;
 	  });
 
@@ -36,17 +37,22 @@ type TCreateMeetingInput =
 const isScheduledMeeting = (
 	input: TCreateMeetingInput
 ): input is TBaseCreateMeetingInput & {
-	status: "Scheduled";
+	meetingType: "Scheduled";
 	startTime: Date;
-} => input.status === "Scheduled" && "startTime" in input;
+} => input.meetingType === "Scheduled" && "startTime" in input;
+
+type TFullMeetingDTO = Omit<TeamMeetingDTO, "participants" | "createdBy"> & {
+	participants: IParticipantDTO[];
+	createdBy: IMemberDTO;
+};
 
 export class WorkspaceMeetingManager {
 	private memberStore: IMemberStore = new MemberStore();
-	private participantStore: IParticipantStore = new ParticipantStore();
+	public participantStore: IParticipantStore = new ParticipantStore();
 	private notificationService: MeetingNotification =
 		MeetingNotification.getInstance();
 	private meetingStore: IMeetingStore<TMemberId> =
-		new MemoryWorkspaceMeetingStore();
+		MemoryWorkspaceMeetingStore.getInstance();
 
 	private async checkMemberAccessToMeeting(
 		meetingId: TMeetingId,
@@ -95,6 +101,16 @@ export class WorkspaceMeetingManager {
 				memberId: member.id,
 			});
 		}
+	}
+
+	private async checkMeetingStatus(
+		meetingId: TMeetingId,
+		status: meetingStatus
+	): Promise<boolean> {
+		const allMeetings = await this.meetingStore.findByStatus(status);
+
+		const meeting = allMeetings.find((m) => m.id === meetingId);
+		return !!meeting;
 	}
 
 	async validateMember(memberId: TMemberId): Promise<IMemberDTO> {
@@ -214,6 +230,41 @@ export class WorkspaceMeetingManager {
 		return meeting as unknown as TeamMeetingDTO | null;
 	}
 
+	async getFullMeetingDetail(id: TMeetingId): Promise<TFullMeetingDTO | null> {
+		const meeting = await this.getMeeting(id);
+		if (!meeting) {
+			return null;
+		}
+
+		const member = await this.memberStore.findById(meeting.createdBy);
+		if (!member) {
+			throw new Error(
+				`Creator with ID: ${meeting.createdBy} not found for meeting ID: ${id}`
+			);
+		}
+
+		const participants = await this.listParticipants(id);
+		if (!participants) {
+			throw new Error(`Participants for meeting ID: ${id} not found`);
+		}
+
+		return {
+			createdBy: member,
+			id: meeting.id,
+			title: meeting.title,
+			status: meeting.status,
+			description: meeting.description,
+			startTime: meeting.startTime,
+			endTime: meeting.endTime,
+			createdAt: meeting.createdAt,
+			workspaceId: meeting.workspaceId,
+			meetingType: meeting.meetingType,
+			participants: {
+				...participants,
+			},
+		};
+	}
+
 	async updateMeeting(
 		meetingId: TMeetingId,
 		status: "Not Started" | "Cancelled"
@@ -221,6 +272,12 @@ export class WorkspaceMeetingManager {
 		const meeting = await this.getMeeting(meetingId);
 		if (!meeting) {
 			throw new Error(`Meeting with ID: ${meetingId} not found`);
+		}
+
+		if (meeting.status === "Ended") {
+			throw new Error(
+				`Cannot update a completed meeting with ID: ${meetingId}`
+			);
 		}
 
 		const member = await this.validateMember(meeting.createdBy);
@@ -249,14 +306,23 @@ export class WorkspaceMeetingManager {
 	}
 
 	async endMeeting(meetingId: TMeetingId): Promise<void> {
+		const checkMeetingStatus = await this.checkMeetingStatus(
+			meetingId,
+			"Active"
+		);
+		if (!checkMeetingStatus) {
+			throw new Error(
+				`Only active meetings can be ended. Meeting with ID: ${meetingId} is not active.`
+			);
+		}
+
 		const meeting = await this.getMeeting(meetingId);
 		if (!meeting) {
 			throw new Error(`Meeting with ID: ${meetingId} not found`);
 		}
 
 		await this.meetingStore.update(meetingId, {
-			status: "Completed",
-			meetingType: "Scheduled",
+			status: "Ended",
 			endTime: new Date(),
 		});
 

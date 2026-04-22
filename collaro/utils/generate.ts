@@ -1,5 +1,5 @@
 import { TMeetingId, TWorkspaceId } from "@collaro/meeting";
-import { TMemberId } from "@collaro/workspace/member";
+import { TMemberId } from "@collaro/workspace/role/member";
 import { TNotificationId } from "@collaro/notification/interface";
 import { TUserId } from "@collaro/user";
 import { TRequestId } from "@collaro/workspace/member-request/interface";
