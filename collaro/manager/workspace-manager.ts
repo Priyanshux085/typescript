@@ -5,14 +5,6 @@ import {
 	workspaceNotification,
 } from "@collaro/notification";
 import { SubscriptionEnforcer, TSubscriptionPlan } from "@collaro/subscription";
-import {
-	MemoryRoleStore,
-	RoleManager,
-	ROLE_LIMITS_BY_SUBSCRIPTION,
-	IRoleValidationResult,
-	TPermission,
-	TRoleId,
-} from "@collaro/workspace/member/role";
 import { IUser, IUserDTO, User } from "@collaro/user";
 import { MemberSorting } from "@collaro/sorting/interface";
 import {
@@ -31,22 +23,69 @@ import {
 	TRequestId,
 } from "../workspace/member-request/interface";
 import { RequestMember } from "../workspace/member-request/class";
+import { WorkspaceRoleManager as RoleManager } from "./workspace-role-manager";
+import { IRoleDTO } from "@collaro/workspace/role";
 
 export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 	private workspaceStore: IWorkspaceStore = MemoryWorkspaceStore.getInstance();
 	private memberStore: IMemberStore = new MemberStore();
-	private roleStore = new MemoryRoleStore();
 	private notificationService: WorkspaceNotification = workspaceNotification;
 	private requestService: IRequestMember = new RequestMember();
 	private user: IUser = new User();
 
 	private sorting = new MemberSorting();
 
+	private async getOwnerDetail(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IMemberDTO | null> {
+		const workspace = await this.findWorkspaceById(workspaceId);
+		if (!workspace) {
+			throw new Error(`Workspace with ID: ${workspaceId} not found.`);
+		}
+
+		return this.listMemberDetails({
+			userID: workspace.ownerId,
+			workspaceId,
+		});
+	}
+
 	private getRoleManager(
 		workspaceId: IWorkspaceDTO["id"],
 		subscription: TSubscriptionPlan
 	): RoleManager {
 		return new RoleManager(workspaceId, subscription);
+	}
+
+	private async createOwnerRole(
+		userId: IUserDTO["id"],
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IMemberDTO & { role: IRoleDTO }> {
+		const roleManager = this.getRoleManager(workspaceId, "free");
+
+		const ownerRole = await roleManager.getPredefinedRole(workspaceId, "owner");
+
+		if (!ownerRole) {
+			throw new Error(
+				`Failed to create owner role for workspace ID: ${workspaceId}.`
+			);
+		}
+
+		const user = await this.user.getUser(userId);
+
+		const ownerMember: IMemberDTO = {
+			userId,
+			id: ID.memberId(),
+			workspaceId,
+			name: `${user?.name}`,
+			roleId: ownerRole.id,
+			createdAt: new Date(),
+			updatedAt: null,
+		};
+		console.log("Owner Member: \n", ownerMember);
+
+		await this.memberStore.save(ownerMember);
+
+		return { ...ownerMember, role: ownerRole };
 	}
 
 	private async joinWorkspace(
@@ -60,7 +99,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			);
 		}
 
-		const user = this.user.getUser(userId);
+		const user = await this.user.getUser(userId);
 		if (!user) {
 			throw new Error(
 				`User with ID: ${userId} not found. Cannot join workspace.`
@@ -77,7 +116,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			workspaceId,
 			workspace.subscription
 		);
-		await roleManager.seedDefaultWorkspaceRoles(workspaceId);
+
 		const memberRole = await roleManager.getPredefinedRole(
 			workspaceId,
 			"member"
@@ -92,20 +131,16 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			id: ID.memberId(),
 			name: user.name,
 			workspaceId,
-			role: memberRole.key,
 			roleId: memberRole.id,
 			createdAt: new Date(),
 			updatedAt: null,
 			userId,
 		};
 
+		const owner = await this.getOwnerDetail(workspaceId);
 		await this.memberStore.save(newMember);
-		await roleManager.assignRoleToMember(
-			newMember.id,
-			workspaceId,
-			memberRole.id,
-			"system"
-		);
+
+		await roleManager.assignRole(newMember.id, "member", owner!.id);
 
 		await this.notificationService.createMemberNotification({
 			type: "request_approved",
@@ -136,12 +171,9 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 	async createWorkspace(
 		workspace: Input<IWorkspaceDTO>
-	): Promise<IWorkspaceDTO> {
+	): Promise<IWorkspaceDTO & { ownerDetail: IMemberDTO }> {
 		const user = await this.user.getUser(workspace.ownerId);
 		if (!user) {
-			console.log(
-				`Owner with ID: ${workspace.ownerId} not found. Cannot create workspace.`
-			);
 			throw new Error(`Owner with ID: ${workspace.ownerId} not found.`);
 		}
 
@@ -155,37 +187,9 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 
 		await this.workspaceStore.save(newWorkspace);
 
-		const roleManager = this.getRoleManager(
-			newWorkspace.id,
-			newWorkspace.subscription
-		);
-
-		await roleManager.seedDefaultWorkspaceRoles(newWorkspace.id);
-		const ownerRole = await roleManager.getPredefinedRole(
-			newWorkspace.id,
-			"owner"
-		);
-		if (!ownerRole) {
-			throw new Error(`Owner role not found for workspace ${newWorkspace.id}.`);
-		}
-
-		const ownerMember: IMemberDTO = {
-			userId: workspace.ownerId,
-			id: ID.memberId(),
-			workspaceId: newWorkspace.id,
-			name: `${user.name}`,
-			role: ownerRole.key,
-			roleId: ownerRole.id,
-			createdAt: new Date(),
-			updatedAt: null,
-		};
-
-		await this.memberStore.save(ownerMember);
-		await roleManager.assignRoleToMember(
-			ownerMember.id,
-			newWorkspace.id,
-			ownerRole.id,
-			"system"
+		const ownerMember = await this.createOwnerRole(
+			workspace.ownerId,
+			newWorkspace.id
 		);
 
 		await this.notificationService.createWorkspaceNotification({
@@ -196,7 +200,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			workspaceId: newWorkspace.id,
 		});
 
-		return newWorkspace;
+		return { ...newWorkspace, ownerDetail: ownerMember };
 	}
 
 	async updateWorkspace(
@@ -312,7 +316,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			return await this.joinWorkspace(request.workspaceId, request.userId);
 		} catch (error: unknown) {
 			throw new Error(
-				`Error approving join request: ${(error as Error).message}`,
+				`Error approving join request:: \n ${(error as Error).message}`,
 				{
 					cause: error,
 				}
@@ -372,7 +376,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			});
 		} catch (error: unknown) {
 			throw new Error(
-				`Error rejecting join request: ${(error as Error).message}`,
+				`Error rejecting join request:: \n ${(error as Error).message}`,
 				{
 					cause: error,
 				}
@@ -388,7 +392,9 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		await this.removeMemberFromWorkspace(workspaceId, memberId, bannedBy);
 	}
 
-	async listMembers(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]> {
+	async listMembers(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<(IMemberDTO & { role: IRoleDTO })[]> {
 		try {
 			const workspace = await this.findWorkspaceById(workspaceId);
 			if (!workspace) {
@@ -399,8 +405,25 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			}
 
 			const list = await this.memberStore.list(workspaceId);
+			const members = this.sorting.sortByName(list, "asc");
 
-			return this.sorting.sortByName(list, "asc");
+			const roles = await this.getRoleManager(
+				workspaceId,
+				workspace.subscription
+			).getRolesForWorkspace();
+
+			const roleMap = new Map<string, IRoleDTO>(
+				roles.map((role) => [String(role.id), role])
+			);
+
+			const result: (IMemberDTO & { role: IRoleDTO })[] = members.map(
+				(member) => ({
+					...member,
+					role: roleMap.get(String(member.roleId))!,
+				})
+			);
+
+			return result;
 		} catch (error) {
 			console.error(
 				`Error fetching members for workspace ID: ${workspaceId}.`,
@@ -435,8 +458,8 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			workspace.id,
 			workspace.subscription
 		);
-		const targetRole = await roleManager.getMemberRole(memberId, workspaceId);
-		if (targetRole?.key === "owner") {
+		const targetRole = await roleManager.getMemberRole(memberId);
+		if (targetRole?.name === "owner") {
 			throw new Error("Workspace owner cannot be removed.");
 		}
 
@@ -457,7 +480,6 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			}
 		}
 
-		await this.roleStore.removeMemberRole(memberId, workspaceId);
 		await this.memberStore.delete(memberId);
 
 		await this.notificationService.createMemberNotification({
@@ -541,219 +563,5 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		workspaceId: IWorkspaceDTO["id"]
 	): Promise<IRequestMemberDTO[]> {
 		return this.requestService.listRequests(workspaceId);
-	}
-
-	async changeMemberRole(
-		workspaceId: IWorkspaceDTO["id"],
-		memberId: TMemberId,
-		newRoleId: TRoleId,
-		changedBy: TMemberId
-	): Promise<void> {
-		const workspace = await this.findWorkspaceById(workspaceId);
-		if (!workspace) {
-			throw new Error(`Workspace with ID: ${workspaceId} not found.`);
-		}
-
-		const targetMember = await this.memberStore.findById(memberId);
-		const actor = await this.memberStore.findById(changedBy);
-		if (!targetMember || !actor) {
-			throw new Error("Member not found.");
-		}
-
-		const roleManager = this.getRoleManager(
-			workspace.id,
-			workspace.subscription
-		);
-		const permission = await roleManager.hasPermission(
-			actor.roleId,
-			"manage_roles:workspace"
-		);
-		if (!permission.hasPermission) {
-			throw new Error(
-				permission.reason ||
-					"You do not have permission to manage member roles."
-			);
-		}
-
-		const nextRole = await roleManager.getRole(newRoleId);
-		if (!nextRole || nextRole.workspaceId !== workspaceId) {
-			throw new Error(
-				`Role with ID ${String(newRoleId)} not found in workspace ${workspaceId}.`
-			);
-		}
-
-		if (targetMember.role === "owner" && nextRole.key !== "owner") {
-			throw new Error("Workspace owner role cannot be changed.");
-		}
-
-		await this.memberStore.update(memberId, {
-			role: nextRole.key,
-			roleId: nextRole.id,
-			updatedAt: new Date(),
-		});
-
-		await roleManager.assignRoleToMember(
-			memberId,
-			workspaceId,
-			nextRole.id,
-			String(changedBy)
-		);
-	}
-
-	async bulkAssignRole(
-		workspaceId: IWorkspaceDTO["id"],
-		memberIds: readonly TMemberId[],
-		roleId: TRoleId,
-		assignedBy: TMemberId
-	): Promise<void> {
-		const workspace = await this.findWorkspaceById(workspaceId);
-		if (!workspace) {
-			throw new Error(`Workspace with ID: ${workspaceId} not found.`);
-		}
-
-		if (
-			!ROLE_LIMITS_BY_SUBSCRIPTION[workspace.subscription].canUseBulkOperations
-		) {
-			throw new Error("Bulk role assignment is not available on this plan.");
-		}
-
-		const actor = await this.memberStore.findById(assignedBy);
-		if (!actor) {
-			throw new Error("Requester not found.");
-		}
-
-		const roleManager = this.getRoleManager(
-			workspace.id,
-			workspace.subscription
-		);
-		const permission = await roleManager.hasPermission(
-			actor.roleId,
-			"manage_roles:workspace"
-		);
-		if (!permission.hasPermission) {
-			throw new Error(
-				permission.reason || "You do not have permission to bulk assign roles."
-			);
-		}
-
-		const nextRole = await roleManager.getRole(roleId);
-		if (!nextRole || nextRole.workspaceId !== workspaceId) {
-			throw new Error(
-				`Role with ID ${String(roleId)} not found in workspace ${workspaceId}.`
-			);
-		}
-
-		for (const candidateMemberId of memberIds) {
-			const candidateMember =
-				await this.memberStore.findById(candidateMemberId);
-			if (candidateMember?.role === "owner" && nextRole.key !== "owner") {
-				throw new Error("Workspace owner role cannot be changed.");
-			}
-		}
-
-		const result = await roleManager.bulkAssignRole({
-			workspaceId,
-			memberIds: memberIds.map((id) => id),
-			roleId,
-			assignedBy: String(assignedBy),
-		});
-
-		for (const memberId of result.successful) {
-			await this.memberStore.update(memberId as unknown as TMemberId, {
-				role: nextRole.key,
-				roleId: nextRole.id,
-				updatedAt: new Date(),
-			});
-		}
-
-		if (result.failureCount > 0) {
-			console.warn(
-				`Bulk role assignment completed with ${result.failureCount} failures.`
-			);
-		}
-	}
-
-	async createCustomRole(
-		workspaceId: IWorkspaceDTO["id"],
-		name: string,
-		permissions: readonly TPermission[],
-		createdBy: TMemberId,
-		options?: { description?: string; parentRoleId?: TRoleId }
-	): Promise<IRoleValidationResult> {
-		const workspace = await this.findWorkspaceById(workspaceId);
-		if (!workspace) {
-			return {
-				success: false,
-				code: "ROLE_NOT_FOUND",
-				message: `Workspace with ID: ${workspaceId} not found.`,
-			};
-		}
-
-		if (
-			!ROLE_LIMITS_BY_SUBSCRIPTION[workspace.subscription].canCreateCustomRoles
-		) {
-			return {
-				success: false,
-				code: "CUSTOM_ROLES_NOT_ALLOWED",
-				message: `${workspace.subscription} plan does not support custom roles.`,
-			};
-		}
-
-		const creator = await this.memberStore.findById(createdBy);
-		if (!creator) {
-			return {
-				success: false,
-				code: "INSUFFICIENT_PERMISSION",
-				message: "Requester not found.",
-			};
-		}
-
-		const roleManager = this.getRoleManager(
-			workspace.id,
-			workspace.subscription
-		);
-		const permission = await roleManager.hasPermission(
-			creator.roleId,
-			"manage_roles:workspace"
-		);
-		if (!permission.hasPermission) {
-			return {
-				success: false,
-				code: "INSUFFICIENT_PERMISSION",
-				message:
-					permission.reason ||
-					"You do not have permission to create custom roles.",
-			};
-		}
-
-		return roleManager.createCustomRole(
-			name,
-			permissions,
-			options,
-			workspaceId
-		);
-	}
-
-	async checkMemberPermission(
-		workspaceId: IWorkspaceDTO["id"],
-		memberId: TMemberId,
-		permission: TPermission
-	): Promise<boolean> {
-		const workspace = await this.findWorkspaceById(workspaceId);
-		if (!workspace) {
-			return false;
-		}
-
-		const member = await this.memberStore.findById(memberId);
-		if (!member) {
-			return false;
-		}
-
-		const roleManager = this.getRoleManager(
-			workspace.id,
-			workspace.subscription
-		);
-		const result = await roleManager.hasPermission(member.roleId, permission);
-		return result.hasPermission;
 	}
 }

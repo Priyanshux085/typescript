@@ -11,7 +11,7 @@ import {
 	TPermission,
 	TPredefinedRoleKey,
 	TRoleId,
-} from "./types";
+} from "./interface";
 
 export class RoleValidator {
 	static canCreateCustomRole(subscription: TSubscriptionPlan, currentCustomRoleCount: number): IRoleValidationResult {
@@ -127,7 +127,7 @@ export class RoleValidator {
 		return {
 			hasPermission: false,
 			permission,
-			reason: `Role ${role.key} does not include permission ${permission}.`,
+			reason: `Role "${role.name}" does not include permission "${permission}".`,
 		};
 	}
 

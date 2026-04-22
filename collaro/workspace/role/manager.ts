@@ -1,5 +1,5 @@
 import { TSubscriptionPlan } from "@collaro/subscription";
-import { IWorkspaceDTO, IWorkspaceStore } from "../../interface";
+import { IWorkspaceDTO, IWorkspaceStore } from "../interface";
 import {
 	IBulkRoleAssignmentRequest,
 	IBulkRoleAssignmentResult,
@@ -8,7 +8,6 @@ import {
 	IInheritanceValidationResult,
 	IPermissionValidationResult,
 	IRoleDTO,
-	IRoleManager,
 	IRoleStore,
 	IRoleValidationResult,
 	IMemberRoleAssignmentDTO,
@@ -18,11 +17,14 @@ import {
 	TPermission,
 	TPredefinedRoleKey,
 	TRoleId,
-} from "./types";
+	IWorkspaceRoleManager,
+	IRoleAssignmentStore,
+} from "./interface";
 import { RoleValidator } from "./validator";
 import { ID } from "@collaro/utils";
 import { MemoryRoleStore } from "./store";
-import { IMemberDTO, MemoryWorkspaceStore } from "..";
+import { IMemberDTO, RoleAssignmentStore } from "./member";
+import { MemoryWorkspaceStore } from "../stores/memory-workspace-store";
 
 function slugifyRoleKey(name: string): string {
 	return name
@@ -39,58 +41,95 @@ const DEFAULT_WORKSPACE_ROLES = [
 	"guest",
 ] as const satisfies readonly TPredefinedRoleKey[];
 
-export class RoleManager implements IRoleManager {
-	private readonly WorkspaceRoleMap: Record<string, IRoleDTO> = {};
+/**
+ * Manages roles and permissions for a workspace.
+ *
+ * ## Key Responsibilities:
+ * - Creating, updating, and deleting custom roles within subscription limits
+ * - Validating role inheritance and permissions against subscription plans
+ * - Seeding predefined roles (owner, admin, member, guest)
+ * - Assigning roles to members
+ * - Managing bulk role operations
+ *
+ * ## Lazy Initialization:
+ * The workspace slug is lazily initialized on first use to avoid antipattern
+ * of async operations in constructors. Use `ensureSlugInitialized()` before
+ * methods that need the slug.
+ *
+ * ## Singleton Dependencies:
+ * - MemoryRoleStore: Shared across all RoleManager instances for a workspace
+ * - RoleAssignmentStore: Shared tracking of member-to-role assignments
+ */
+export class RoleManager implements IWorkspaceRoleManager {
+	private readonly WorkspaceRoleMap: Record<string, IRoleDTO["name"]> = {};
 	private readonly workspaceStore: IWorkspaceStore =
 		MemoryWorkspaceStore.getInstance();
-	private readonly store: IRoleStore = new MemoryRoleStore();
+	public store: IRoleStore = MemoryRoleStore.getInstance();
 	public slug: IWorkspaceDTO["slug"] = "";
+	public roleAssignmentStore: IRoleAssignmentStore = RoleAssignmentStore.getInstance();
+	private slugInitialized = false;
+	private slugInitPromise: Promise<string> | null = null;
+
+	private async ensureSlugInitialized(): Promise<string> {
+		if (this.slugInitialized) {
+			return this.slug;
+		}
+
+		if (this.slugInitPromise) {
+			return this.slugInitPromise;
+		}
+
+		this.slugInitPromise = this.fetchSlug(this.workspaceId);
+		this.slug = await this.slugInitPromise;
+		this.slugInitialized = true;
+		return this.slug;
+	}
 
 	private async fetchSlug(workspaceId: IWorkspaceDTO["id"]): Promise<string> {
-		await this.workspaceStore
-			.findById(workspaceId)
-			.then((workspace) => {
-				if (!workspace) {
-					throw new Error(
-						`Workspace with ID ${String(workspaceId)} not found.`
-					);
-				}
-
-				// Store the slug for role ID generation
-				this.slug = workspace.slug;
-			})
-			.catch((error) => {
-				console.error("Error initializing RoleManager:", error);
-				throw error;
-			});
-
-		return this.slug;
+		try {
+			const workspace = await this.workspaceStore.findById(workspaceId);
+			if (!workspace) {
+				throw new Error(
+					`Workspace with ID ${String(workspaceId)} not found.`
+				);
+			}
+			this.slug = workspace.slug;
+			return workspace.slug;
+		} catch (error) {
+			console.error("Error initializing RoleManager:", error);
+			throw new Error(
+				`Failed to initialize RoleManager for workspace ${String(workspaceId)}`,
+				{ cause: error }
+			);
+		}
 	}
 
 	constructor(
 		readonly workspaceId: IWorkspaceDTO["id"],
 		private readonly subscriptionPlan: TSubscriptionPlan
 	) {
-		this.fetchSlug(workspaceId).catch((error) => {
-			console.error("Failed to initialize RoleManager:", error);
-		});
+		// Lazy initialization of slug - will be initialized on first use
+		// This prevents antipattern of async operations in constructor
 	}
 
 	async seedDefaultWorkspaceRoles(
 		workspaceId: IWorkspaceDTO["id"]
 	): Promise<IRoleDTO[]> {
+		await this.ensureSlugInitialized();
+
 		// Seed predefined roles - check if they already exist to avoid duplicates
+		const seededRoles: IRoleDTO[] = [];
+
 		for (const roleKey of DEFAULT_WORKSPACE_ROLES) {
-			const existingRole = await this.store.findByKey(workspaceId, roleKey);
+			const existingRole = await this.store.findByName(workspaceId, roleKey);
 			if (existingRole) {
-				this.WorkspaceRoleMap[String(existingRole.id)] = existingRole;
+				this.WorkspaceRoleMap[String(existingRole.id)] = existingRole.name;
 				continue;
 			}
 
 			const seededRole: IRoleDTO = {
 				id: ID.roleId(this.slug),
 				workspaceId,
-				key: roleKey,
 				name: roleKey.charAt(0).toUpperCase() + roleKey.slice(1),
 				description: `${roleKey} role for the workspace`,
 				permissions: PREDEFINED_ROLE_PERMISSIONS[roleKey],
@@ -101,21 +140,29 @@ export class RoleManager implements IRoleManager {
 			};
 
 			await this.store.save(seededRole);
-			this.WorkspaceRoleMap[String(seededRole.id)] = seededRole;
+			this.WorkspaceRoleMap[String(seededRole.id)] = seededRole.name;
+			seededRoles.push(seededRole);
 		}
 
-		return Object.values(this.WorkspaceRoleMap);
+		return seededRoles;
+	}
+
+	async getRole(role: IRoleDTO["name"]): Promise<IRoleDTO | null> {
+		try {
+			return await this.store.findByName(this.workspaceId, role);
+		} catch (error) {
+			throw new Error(`Failed to fetch role "${role}"`, { cause: error });
+		}
 	}
 
 	async createCustomRole(
 		name: string,
 		permissions: readonly TPermission[],
 		options?: { description?: string; parentRoleId?: TRoleId },
-		workspaceId?: IWorkspaceDTO["id"]
 	): Promise<IRoleValidationResult> {
-		const workspaceRoles = await this.getRolesForWorkspace(
-			workspaceId || this.workspaceId
-		);
+		await this.ensureSlugInitialized();
+
+		const workspaceRoles = await this.store.findByWorkspace(this.workspaceId);
 		const currentCustomRoleCount = workspaceRoles.filter(
 			(role) => role.isCustom
 		).length;
@@ -138,10 +185,11 @@ export class RoleManager implements IRoleManager {
 			};
 		}
 
-		const existingRole = await this.store.findByKey(
-			workspaceId || this.workspaceId,
+		const existingRole = await this.store.findByName(
+			this.workspaceId,	
 			roleKey
 		);
+
 		if (existingRole) {
 			return {
 				success: false,
@@ -188,8 +236,7 @@ export class RoleManager implements IRoleManager {
 
 		const role: IRoleDTO = {
 			id: roleId,
-			workspaceId: workspaceId || this.workspaceId,
-			key: roleKey,
+			workspaceId: this.workspaceId,
 			name,
 			description: options?.description,
 			permissions: filteredPermissions,
@@ -246,7 +293,7 @@ export class RoleManager implements IRoleManager {
 		}
 
 		if (updates.parentRoleId) {
-			const workspaceRoles = await this.getRolesForWorkspace(role.workspaceId);
+			const workspaceRoles = await this.store.findByWorkspace(role.workspaceId);
 			const validation = RoleValidator.validateInheritance(
 				role.id,
 				updates.parentRoleId,
@@ -278,19 +325,19 @@ export class RoleManager implements IRoleManager {
 		return { success: true, role: updatedRole };
 	}
 
-	async deleteRole(roleId: TRoleId): Promise<void> {
-		const role = await this.store.findById(roleId);
-		if (!role) {
-			return;
+	async deleteRole(role: IRoleDTO["name"]): Promise<void> {
+		const roleDto = await this.store.findByName(this.workspaceId, role);
+		if (!roleDto) {
+			throw new Error(`Role "${role}" not found in workspace.`);
 		}
 
-		if (!role.isCustom) {
+		if (!roleDto.isCustom) {
 			throw new Error("Predefined roles cannot be deleted.");
 		}
 
-		const assignments = await this.store.listAssignments(role.workspaceId);
+		const assignments = await this.store.listAssignments(roleDto.workspaceId);
 		for (const assignment of assignments) {
-			if (assignment.roleId === roleId) {
+			if (assignment.roleId === roleDto.id) {
 				await this.store.removeMemberRole(
 					assignment.memberId,
 					assignment.workspaceId
@@ -298,24 +345,65 @@ export class RoleManager implements IRoleManager {
 			}
 		}
 
-		await this.store.delete(roleId);
+		await this.store.delete(roleDto.id);
 	}
 
-	async getRole(roleId: TRoleId): Promise<IRoleDTO | null> {
-		return this.store.findById(roleId);
+	async assignRole(
+		memberId: IMemberDTO["id"],
+		role: IRoleDTO["name"],
+		assignedBy: IMemberDTO["id"]
+	): Promise<void> {
+		const roleEntity = await this.store.findByName(this.workspaceId, role);
+		if (!roleEntity) {
+			throw new Error(`Role "${role}" not found in workspace.`);
+		}
+
+		try {
+			await this.store.assignRole({
+				memberId,
+				workspaceId: this.workspaceId,
+				roleId: roleEntity.id,
+				assignedBy,
+				assignedAt: new Date(),
+			});
+		} catch (error) {
+			throw new Error(
+				`Failed to assign role "${role}" to member ${String(memberId)}`,
+				{ cause: error }
+			);
+		}
 	}
 
 	async getRoleByKey(
 		workspaceId: IWorkspaceDTO["id"],
 		key: string
 	): Promise<IRoleDTO | null> {
-		return this.store.findByKey(workspaceId, key);
+		return this.store.findByName(workspaceId, key);
 	}
 
-	async getRolesForWorkspace(
-		workspaceId: IWorkspaceDTO["id"]
-	): Promise<IRoleDTO[]> {
-		return this.store.findByWorkspace(workspaceId);
+	async getRoleByID(roleId: TRoleId): Promise<IRoleDTO | null> {
+		try {
+			return await this.store.findById(roleId);
+		} catch (error) {
+			throw new Error(`Failed to fetch role with ID ${String(roleId)}`, {
+				cause: error,
+			});
+		}
+	}
+
+	async getRolesForWorkspace(): Promise<IRoleDTO[]> {
+		try {
+			return await this.store.findByWorkspace(this.workspaceId);
+		} catch (error) {
+			throw new Error(
+				`Failed to fetch roles for workspace ${String(this.workspaceId)}`,
+				{ cause: error }
+			);
+		}
+	}
+
+	async listAssignments(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberRoleAssignmentDTO[]> {
+		return this.store.listAssignments(workspaceId);
 	}
 
 	async getPredefinedRole(
@@ -323,7 +411,7 @@ export class RoleManager implements IRoleManager {
 		key: TPredefinedRoleKey
 	): Promise<IRoleDTO | null> {
 		await this.seedDefaultWorkspaceRoles(workspaceId);
-		return this.store.findByKey(workspaceId, key);
+		return this.store.findByName(workspaceId, key);
 	}
 
 	async hasPermission(
@@ -373,7 +461,7 @@ export class RoleManager implements IRoleManager {
 		memberId: IMemberDTO["id"],
 		workspaceId: IWorkspaceDTO["id"],
 		roleId: TRoleId,
-		assignedBy: string
+		assignedBy: IMemberDTO["id"]
 	): Promise<void> {
 		const role = await this.store.findById(roleId);
 		if (!role) {
@@ -397,12 +485,8 @@ export class RoleManager implements IRoleManager {
 
 	async getMemberRole(
 		memberId: IMemberDTO["id"],
-		workspaceId: IWorkspaceDTO["id"]
 	): Promise<IRoleDTO | null> {
-		const assignment = await this.store.getMemberRoleAssignment(
-			memberId,
-			workspaceId
-		);
+		const assignment = await this.roleAssignmentStore.getAssignment(memberId, this.workspaceId);
 		if (!assignment) {
 			return null;
 		}
@@ -537,7 +621,7 @@ export class RoleManager implements IRoleManager {
 						assignment.memberId,
 						request.workspaceId,
 						request.fallbackRoleId,
-						assignment.assignedBy
+						request.approvedBy
 					);
 				} else {
 					await this.store.removeMemberRole(

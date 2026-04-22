@@ -8,10 +8,11 @@ import {
 const container = new ReportContainer();
 const context = new ReportContext();
 
-async function generateReport(fileType: keyof typeof FileType): Promise<any> {
-	
+async function generateReport(
+	fileType: keyof typeof FileType
+): Promise<unknown> {
 	const strategy = container.getStrategy(fileType);
-	
+
 	context.setStrategy(strategy);
 	return await context.generateReport();
 } 

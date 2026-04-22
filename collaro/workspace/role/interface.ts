@@ -1,7 +1,7 @@
 import { TSubscriptionPlan } from "@collaro/subscription";
 import { BRAND } from "@collaro/utils/brand";
-import { IWorkspaceDTO } from "../../interface";
-import { IMemberDTO } from "../interface";
+import { IWorkspaceDTO } from "../interface";
+import { IMemberDTO } from "./member/interface";
 
 export type TRoleId = BRAND<"RoleId">;
 
@@ -99,7 +99,6 @@ export const PREDEFINED_ROLE_PERMISSIONS: Readonly<Record<TPredefinedRoleKey, re
 export interface IRoleDTO {
 	readonly id: TRoleId;
 	readonly workspaceId: IWorkspaceDTO["id"];
-	readonly key: TPredefinedRoleKey | string;
 	readonly name: string;
 	readonly description?: string;
 	readonly permissions: readonly TPermission[];
@@ -113,7 +112,7 @@ export interface IMemberRoleAssignmentDTO {
 	readonly memberId: IMemberDTO["id"];
 	readonly workspaceId: IWorkspaceDTO["id"];
 	readonly roleId: TRoleId;
-	readonly assignedBy: IMemberDTO["name"];
+	readonly assignedBy?: IMemberDTO["id"];
 	readonly assignedAt: Date;
 }
 
@@ -148,7 +147,7 @@ export interface IBulkRoleAssignmentRequest {
 	readonly workspaceId: IWorkspaceDTO["id"];
 	readonly memberIds: readonly IMemberDTO["id"][];
 	readonly roleId: TRoleId;
-	readonly assignedBy: string;
+	readonly assignedBy: IMemberDTO["id"];
 }
 
 export interface IBulkRoleAssignmentResult {
@@ -173,6 +172,7 @@ export interface IBulkRoleDeleteRequest {
 	readonly workspaceId: IWorkspaceDTO["id"];
 	readonly roleIds: readonly TRoleId[];
 	readonly fallbackRoleId?: TRoleId;
+	readonly approvedBy: IMemberDTO["id"];
 }
 
 export interface IRoleFeatureLimits {
@@ -246,22 +246,14 @@ export const ROLE_ERROR_CODES = {
 export interface IRoleStore {
 	save(role: IRoleDTO): Promise<void>;
 	findById(id: TRoleId): Promise<IRoleDTO | null>;
-	findByKey(
-		workspaceId: IWorkspaceDTO["id"],
-		key: string
-	): Promise<IRoleDTO | null>;
 	findByName(
 		workspaceId: IWorkspaceDTO["id"],
-		name: string
+		name: IRoleDTO["name"]
 	): Promise<IRoleDTO | null>;
 	findByWorkspace(workspaceId: IWorkspaceDTO["id"]): Promise<IRoleDTO[]>;
 	update(id: TRoleId, role: Partial<IRoleDTO>): Promise<void>;
 	delete(id: TRoleId): Promise<void>;
 	assignRole(assignment: IMemberRoleAssignmentDTO): Promise<void>;
-	getMemberRoleAssignment(
-		memberId: IMemberDTO["id"],
-		workspaceId: IWorkspaceDTO["id"]
-	): Promise<IMemberRoleAssignmentDTO | null>;
 	removeMemberRole(
 		memberId: IMemberDTO["id"],
 		workspaceId: IWorkspaceDTO["id"]
@@ -271,12 +263,47 @@ export interface IRoleStore {
 	): Promise<IMemberRoleAssignmentDTO[]>;
 }
 
-export interface IRoleManager {
+export interface IRoleAssignmentStore {
+	saveAssignment(assignment: IMemberRoleAssignmentDTO): Promise<void>;
+	getAssignment(
+		memberId: IMemberDTO["id"],
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IMemberRoleAssignmentDTO | null>;
+	removeAssignment(
+		memberId: IMemberDTO["id"],
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<void>;
+	listAssignments(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IMemberRoleAssignmentDTO[]>;
+}
+
+export type TWorkspaceRoleMap = Map<string, IRoleDTO["name"]>;
+
+export interface IWorkspaceRoleManager {
+	/**
+	 * The role store is responsible for managing role definitions within a workspace,
+	 * including creating, retrieving, updating, and deleting roles, as well as managing role assignments to members.
+	 */
+	store: IRoleStore;
+
+	/**
+	 * The role assignment store is responsible for managing the associations between members and roles within a workspace.
+	 * It provides methods to save, retrieve, and remove role assignments, as well as to list all assignments for a given workspace.
+	 */
+	roleAssignmentStore: IRoleAssignmentStore;
+	
 	/**
 	 * The ID of the workspace that the role manager is operating within.
 	 * This is used to scope all role management operations to a specific workspace, ensuring that roles are created, updated, and assigned within the context of the correct workspace.
 	 */
 	workspaceId: IWorkspaceDTO["id"];
+
+	/**
+	 * Lists all role assignments for a given workspace.
+	 * @param workspaceId The ID of the workspace to manage roles for.
+	 */
+	listAssignments(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberRoleAssignmentDTO[]>;
 
 	/**
 	 * Seeds the workspace with predefined roles based on the subscription plan.
@@ -301,7 +328,6 @@ export interface IRoleManager {
 		name: string,
 		permissions: readonly TPermission[],
 		options?: { description?: string; parentRoleId?: TRoleId },
-		workspaceId?: IWorkspaceDTO["id"]
 	): Promise<IRoleValidationResult>;
 
 	/**
@@ -324,23 +350,22 @@ export interface IRoleManager {
 	 * @param roleId The ID of the role to delete.
 	 * @returns A promise that resolves when the role has been deleted.
 	 */
-	deleteRole(roleId: TRoleId): Promise<void>;
+	deleteRole(role: IRoleDTO["name"]): Promise<void>;
 
 	/**
 	 * Gets a role by its ID.
 	 * @param roleId The ID of the role to retrieve.
 	 * @returns A promise that resolves to the role DTO if found, or null if not found.
 	 */
-	getRole(roleId: TRoleId): Promise<IRoleDTO | null>;
+	getRole(role: IRoleDTO["name"]): Promise<IRoleDTO | null>;
 
 	/**
 	 * Gets a role by its unique key within the workspace.
 	 * @param workspaceId
 	 * @param key
 	 */
-	getRoleByKey(
-		workspaceId: IWorkspaceDTO["id"],
-		key: string
+	getRoleByID(
+		roleId: TRoleId
 	): Promise<IRoleDTO | null>;
 
 	/**
@@ -348,17 +373,7 @@ export interface IRoleManager {
 	 * @param workspaceId
 	 * @returns A promise that resolves to an array of role DTOs associated with the workspace.
 	 */
-	getRolesForWorkspace(workspaceId: IWorkspaceDTO["id"]): Promise<IRoleDTO[]>;
-
-	/**
-	 * Gets a predefined role by its key within the workspace.
-	 * @param workspaceId
-	 * @param key The predefined role key (e.g., "owner", "admin", "member", "guest").
-	 */
-	getPredefinedRole(
-		workspaceId: IWorkspaceDTO["id"],
-		key: TPredefinedRoleKey
-	): Promise<IRoleDTO | null>;
+	getRolesForWorkspace(): Promise<IRoleDTO[]>;
 
 	/**
 	 * Checks if a role has a specific permission, taking into account inherited permissions from parent roles.
@@ -392,16 +407,31 @@ export interface IRoleManager {
 
 	/**
 	 * Assigns a role to a member within a workspace.
+	 * Optimized to accept either TRoleId (direct, fastest) or role key (with validation).
+	 *
 	 * @param memberId The ID of the member to assign the role to.
 	 * @param workspaceId The ID of the workspace where the role is assigned.
-	 * @param roleId The ID of the role to assign.
+	 * @param roleKeyOrId The role to assign - can be a TRoleId for direct lookup (optimal performance)
+	 *                     or a keyof TWorkspaceRoleMap for key-based lookup.
 	 * @param assignedBy The ID of the user who is assigning the role.
+	 *
+	 * @throws Error if the role is not found or does not belong to the workspace.
+	 *
+	 * @remarks
+	 * Performance tip: Pass TRoleId directly when available for optimal performance.
+	 * The method tries ID lookup first (fastest), then falls back to key lookup.
+	 *
+	 * @example
+	 * // Optimal: using TRoleId
+	 * await roleManager.assignRole(memberId, workspaceId, roleDTO.id, assignedBy);
+	 *
+	 * // Alternative: using role key
+	 * await roleManager.assignRole(memberId, workspaceId, "moderator", assignedBy);
 	 */
-	assignRoleToMember(
+	assignRole(
 		memberId: IMemberDTO["id"],
-		workspaceId: IWorkspaceDTO["id"],
-		roleId: TRoleId,
-		assignedBy: string
+		role: IRoleDTO["name"],
+		assignedBy: IMemberDTO["id"]
 	): Promise<void>;
 
 	/**
@@ -411,47 +441,46 @@ export interface IRoleManager {
 	 */
 	getMemberRole(
 		memberId: IMemberDTO["id"],
-		workspaceId: IWorkspaceDTO["id"]
 	): Promise<IRoleDTO | null>;
 
-	/**
-	 * Assigns roles to multiple members within a workspace.
-	 * @param request The bulk role assignment request.
-	 */
-	bulkAssignRole(
-		request: IBulkRoleAssignmentRequest
-	): Promise<IBulkRoleAssignmentResult>;
+	// /**
+	//  * Assigns roles to multiple members within a workspace.
+	//  * @param request The bulk role assignment request.
+	//  */
+	// bulkAssignRole(
+	// 	request: IBulkRoleAssignmentRequest
+	// ): Promise<IBulkRoleAssignmentResult>;
 
-	/**
-	 * Assignment of multiple roles to multiple members within a workspace.
-	 * @param request The bulk role update request.
-	 */
-	bulkUpdateRoles(
-		request: IBulkRoleUpdateRequest
-	): Promise<IRoleValidationResult[]>;
+	// /**
+	//  * Assignment of multiple roles to multiple members within a workspace.
+	//  * @param request The bulk role update request.
+	//  */
+	// bulkUpdateRoles(
+	// 	request: IBulkRoleUpdateRequest
+	// ): Promise<IRoleValidationResult[]>;
 
-	/**
-	 * Deletes multiple roles within a workspace.
-	 * @param request The bulk role delete request.
-	 * @returns A promise that resolves when the roles have been deleted, or rejects with an error if the operation fails due to permission issues, validation errors, or if any of the roles are not found or are predefined roles that cannot be deleted.
-	 */
-	bulkDeleteRoles(request: IBulkRoleDeleteRequest): Promise<void>;
+	// /**
+	//  * Deletes multiple roles within a workspace.
+	//  * @param request The bulk role delete request.
+	//  * @returns A promise that resolves when the roles have been deleted, or rejects with an error if the operation fails due to permission issues, validation errors, or if any of the roles are not found or are predefined roles that cannot be deleted.
+	//  */
+	// bulkDeleteRoles(request: IBulkRoleDeleteRequest): Promise<void>;
 
-	/**
-	 * Validates the inheritance relationship between a role and its parent role.
-	 * @param roleId The ID of the role to validate.
-	 * @param parentRoleId The ID of the parent role.
-	 * @returns A promise that resolves to the result of the inheritance validation, including success status, whether there is a circular dependency, the chain of roles in the inheritance hierarchy, and any relevant messages or error codes.
-	 */
-	validateInheritance(
-		roleId: TRoleId,
-		parentRoleId: TRoleId
-	): Promise<IInheritanceValidationResult>;
+	// /**
+	//  * Validates the inheritance relationship between a role and its parent role.
+	//  * @param roleId The ID of the role to validate.
+	//  * @param parentRoleId The ID of the parent role.
+	//  * @returns A promise that resolves to the result of the inheritance validation, including success status, whether there is a circular dependency, the chain of roles in the inheritance hierarchy, and any relevant messages or error codes.
+	//  */
+	// validateInheritance(
+	// 	roleId: TRoleId,
+	// 	parentRoleId: TRoleId
+	// ): Promise<IInheritanceValidationResult>;
 
-	/**
-	 * Computes the full set of permissions for a role, including inherited permissions from parent roles.
-	 * @param role The role DTO to compute permissions for.
-	 * @returns A promise that resolves to an array of permissions that the role has, taking into account all levels of inheritance.
-	 */
-	computeAllPermissions(role: IRoleDTO): Promise<readonly TPermission[]>;
+	// /**
+	//  * Computes the full set of permissions for a role, including inherited permissions from parent roles.
+	//  * @param role The role DTO to compute permissions for.
+	//  * @returns A promise that resolves to an array of permissions that the role has, taking into account all levels of inheritance.
+	//  */
+	// computeAllPermissions(role: IRoleDTO): Promise<readonly TPermission[]>;
 }

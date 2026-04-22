@@ -6,4 +6,4 @@ export * from "./meeting";
 export * from "./manager";
 export * from "./notification";
 export * from "./subscription";
-export * from "./workspace/member/role";
+export * from "./workspace/role";

@@ -1,4 +1,3 @@
-export * from "./types";
+export * from "./interface";
 export * from "./validator";
 export * from "./store";
-export * from "./manager";
