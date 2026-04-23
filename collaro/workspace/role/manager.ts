@@ -19,6 +19,7 @@ import {
 	TRoleId,
 	IWorkspaceRoleManager,
 	IRoleAssignmentStore,
+	TCreateCustomRoleParams,
 } from "./interface";
 import { RoleValidator } from "./validator";
 import { ID } from "@collaro/utils";
@@ -66,7 +67,8 @@ export class RoleManager implements IWorkspaceRoleManager {
 		MemoryWorkspaceStore.getInstance();
 	public store: IRoleStore = MemoryRoleStore.getInstance();
 	public slug: IWorkspaceDTO["slug"] = "";
-	public roleAssignmentStore: IRoleAssignmentStore = RoleAssignmentStore.getInstance();
+	public roleAssignmentStore: IRoleAssignmentStore =
+		RoleAssignmentStore.getInstance();
 	private slugInitialized = false;
 	private slugInitPromise: Promise<string> | null = null;
 
@@ -89,9 +91,7 @@ export class RoleManager implements IWorkspaceRoleManager {
 		try {
 			const workspace = await this.workspaceStore.findById(workspaceId);
 			if (!workspace) {
-				throw new Error(
-					`Workspace with ID ${String(workspaceId)} not found.`
-				);
+				throw new Error(`Workspace with ID ${String(workspaceId)} not found.`);
 			}
 			this.slug = workspace.slug;
 			return workspace.slug;
@@ -155,11 +155,11 @@ export class RoleManager implements IWorkspaceRoleManager {
 		}
 	}
 
-	async createCustomRole(
-		name: string,
-		permissions: readonly TPermission[],
-		options?: { description?: string; parentRoleId?: TRoleId },
-	): Promise<IRoleValidationResult> {
+	async createCustomRole({
+		name,
+		permissions,
+		options,
+	}: TCreateCustomRoleParams): Promise<IRoleValidationResult> {
 		await this.ensureSlugInitialized();
 
 		const workspaceRoles = await this.store.findByWorkspace(this.workspaceId);
@@ -185,10 +185,7 @@ export class RoleManager implements IWorkspaceRoleManager {
 			};
 		}
 
-		const existingRole = await this.store.findByName(
-			this.workspaceId,	
-			roleKey
-		);
+		const existingRole = await this.store.findByName(this.workspaceId, roleKey);
 
 		if (existingRole) {
 			return {
@@ -402,7 +399,9 @@ export class RoleManager implements IWorkspaceRoleManager {
 		}
 	}
 
-	async listAssignments(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberRoleAssignmentDTO[]> {
+	async listAssignments(
+		workspaceId: IWorkspaceDTO["id"]
+	): Promise<IMemberRoleAssignmentDTO[]> {
 		return this.store.listAssignments(workspaceId);
 	}
 
@@ -483,10 +482,11 @@ export class RoleManager implements IWorkspaceRoleManager {
 		await this.store.assignRole(assignment);
 	}
 
-	async getMemberRole(
-		memberId: IMemberDTO["id"],
-	): Promise<IRoleDTO | null> {
-		const assignment = await this.roleAssignmentStore.getAssignment(memberId, this.workspaceId);
+	async getMemberRole(memberId: IMemberDTO["id"]): Promise<IRoleDTO | null> {
+		const assignment = await this.roleAssignmentStore.getAssignment(
+			memberId,
+			this.workspaceId
+		);
 		if (!assignment) {
 			return null;
 		}

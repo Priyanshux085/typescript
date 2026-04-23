@@ -334,7 +334,6 @@ export interface IWorkspaceRoleManager {
 	 * @remarks Custom roles allow for tailored permission sets beyond predefined roles, enabling granular access control within the workspace.
 	 */
 	createCustomRole({
-		approvedBy,
 		name,
 		permissions,
 		options,

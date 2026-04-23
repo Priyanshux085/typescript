@@ -2,7 +2,7 @@ import { TWorkspaceId } from "../workspace";
 import { BRAND } from "@collaro/utils/brand";
 import { Input } from "@collaro/utils/omit";
 import { IParticipantStore } from "./stores";
-import { TMemberId } from "@collaro/workspace/role/member";
+import { IMemberDTO, TMemberId } from "@collaro/workspace/role/member";
 
 export type TMeetingId = BRAND<"MeetingId">;
 export type { TWorkspaceId };
@@ -30,7 +30,7 @@ export interface IMeetingDTO<T> {
 }
 
 export interface IWorkspaceMeetingDTO extends IMeetingDTO<TMemberId> {
-  workspaceId: TWorkspaceId;
+	workspaceId: TWorkspaceId;
 }
 
 export interface IMeeting<T> {
@@ -43,7 +43,9 @@ export interface IMeeting<T> {
   deleteMeeting(id: TMeetingId): void;
 }
 
-export type TeamMeetingDTO = IMeetingDTO<TMemberId> & { workspaceId: TWorkspaceId };
+export type TeamMeetingDTO = IMeetingDTO<TMemberId> & {
+	workspaceId: TWorkspaceId;
+} & { callerDetail: IMemberDTO };
 
 export interface IWorkspaceMeeting {
   meeting: IWorkspaceMeetingDTO;

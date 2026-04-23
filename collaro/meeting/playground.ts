@@ -54,11 +54,10 @@ async function AvengersMeetingPlayground() {
 	const meeting = await meetingManager.createMeeting({
 		createdBy: tonyMember!.id,
 		workspaceId: avengersWorkspace.id,
-		status: "Scheduled",
 		title: "Strategy Meeting",
 		meetingType: "Instant",
 		description: "Discuss strategy for the upcoming mission",
-		startTime: new Date(Date.now() + 60 * 60 * 1000),
+		callerDetail: tonyMember!,
 	});
 
 	await meetingManager.joinMeeting(meeting.id, steveMember!.id);

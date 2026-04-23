@@ -2,12 +2,8 @@ import { IUserDTO } from "@collaro/user";
 import { Input } from "@collaro/utils/omit";
 import { IWorkspaceDTO, TRequestId } from "@collaro/workspace";
 import { BRAND } from "@collaro/utils/brand";
-import {
-	IRoleDTO,
-	// IRoleValidationResult,
-	// TPermission,
-	// TRoleId,
-} from "@collaro/workspace/role";
+import { IInviteDTO } from "@collaro/workspace/workspace-invite";
+import { expirationTimeMap } from "@collaro/utils/time";
 
 export type TMemberId = BRAND<"MemberId">;
 
@@ -52,6 +48,28 @@ export interface IMemberStore {
 	): Promise<boolean>;
 }
 
+export type TInviteInput<T> = Omit<
+	T,
+	"id" | "createdAt" | "updatedAt" | "status" | "expirationDate"
+>;
+
+export type TExpiartionParams = Parameters<typeof expirationTimeMap>[0];
+
+export type TCreateInviteDTO = TInviteInput<IInviteDTO> & {
+	expirationTime: TExpiartionParams;
+};
+
+export type TCreateInviteInput =
+	| ({
+			type: "email";
+			invitedEmail: string;
+	  } & TCreateInviteDTO)
+	| ({
+			type: "userId";
+			invitedUserId: IUserDTO["id"];
+	  } & TCreateInviteDTO);
+
+
 export interface IWorkspaceMemberManager {
 	approveJoinRequest(
 		requestId: TRequestId,
@@ -60,9 +78,7 @@ export interface IWorkspaceMemberManager {
 	createWorkspace(
 		workspace: Input<IWorkspaceDTO>
 	): Promise<IWorkspaceDTO & { ownerDetail: IMemberDTO }>;
-	listMembers(
-		workspaceId: IWorkspaceDTO["id"]
-	): Promise<(IMemberDTO & { role: IRoleDTO })[]>;
+	listMembers(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]>;
 	banMember(
 		workspaceId: IWorkspaceDTO["id"],
 		memberId: TMemberId,
@@ -73,6 +89,17 @@ export interface IWorkspaceMemberManager {
 		memberId: TMemberId,
 		removedBy?: TMemberId
 	): Promise<void>;
+	rejectJoinRequest(
+		requestId: TRequestId,
+		rejectedBy: TMemberId
+	): Promise<void>;
+	createInvite(input: TCreateInviteInput): Promise<IInviteDTO>;
+	// acceptInvite(
+	// 	inviteId: IInviteDTO["id"],
+	// 	type: "email" | "userId",
+	// 	approvedBy: TMemberId
+	// ): Promise<IMemberDTO>;
+
 	// // Role management methods
 	// changeMemberRole(
 	// 	workspaceId: IWorkspaceDTO["id"],

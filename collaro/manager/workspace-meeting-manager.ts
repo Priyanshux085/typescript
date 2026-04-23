@@ -41,13 +41,12 @@ const isScheduledMeeting = (
 	startTime: Date;
 } => input.meetingType === "Scheduled" && "startTime" in input;
 
-type TFullMeetingDTO = Omit<TeamMeetingDTO, "participants" | "createdBy"> & {
+type TFullMeetingDTO = Omit<TeamMeetingDTO, "participants"> & {
 	participants: IParticipantDTO[];
-	createdBy: IMemberDTO;
 };
 
 export class WorkspaceMeetingManager {
-	private memberStore: IMemberStore = new MemberStore();
+	private memberStore: IMemberStore = MemberStore.getInstance();
 	public participantStore: IParticipantStore = new ParticipantStore();
 	private notificationService: MeetingNotification =
 		MeetingNotification.getInstance();
@@ -137,7 +136,7 @@ export class WorkspaceMeetingManager {
 			}
 
 			// Validation
-			const member = await this.validateMember(input.createdBy);
+			const caller = await this.validateMember(input.createdBy);
 
 			// Type-safe handling of startTime based on discriminated union
 			const startTime = isScheduledMeeting(input)
@@ -156,7 +155,7 @@ export class WorkspaceMeetingManager {
 				endTime: null,
 				createdAt: new Date(),
 				participants: {
-					[String(input.createdBy)]: member.name,
+					[String(input.createdBy)]: caller.name,
 				},
 			};
 
@@ -164,8 +163,8 @@ export class WorkspaceMeetingManager {
 			await this.participantStore.addParticipant({
 				meetingId: meeting.id,
 				memberId: input.createdBy,
-				name: member.name,
-				role: member.role,
+				name: caller.name,
+				role: caller.role,
 				joinedAt: new Date(),
 				leaveAt: null,
 			});
@@ -174,10 +173,13 @@ export class WorkspaceMeetingManager {
 			await this.meetingStore.save(meeting);
 
 			// Notify all members in the workspace about the new meeting except the creator
-			await this.sendNoticationToMembers("meeting_created", meeting.id, member);
-
+			await this.sendNoticationToMembers("meeting_created", meeting.id, caller);
 			// Return the created meeting
-			return meeting;
+
+			return {
+				...meeting,
+				callerDetail: caller,
+			};
 		} catch (error) {
 			console.error("Error creating meeting:", error);
 			throw error;
@@ -236,8 +238,8 @@ export class WorkspaceMeetingManager {
 			return null;
 		}
 
-		const member = await this.memberStore.findById(meeting.createdBy);
-		if (!member) {
+		const caller = await this.validateMember(meeting.createdBy);
+		if (!caller) {
 			throw new Error(
 				`Creator with ID: ${meeting.createdBy} not found for meeting ID: ${id}`
 			);
@@ -249,16 +251,8 @@ export class WorkspaceMeetingManager {
 		}
 
 		return {
-			createdBy: member,
-			id: meeting.id,
-			title: meeting.title,
-			status: meeting.status,
-			description: meeting.description,
-			startTime: meeting.startTime,
-			endTime: meeting.endTime,
-			createdAt: meeting.createdAt,
-			workspaceId: meeting.workspaceId,
-			meetingType: meeting.meetingType,
+			...meeting,
+			callerDetail: caller,
 			participants: {
 				...participants,
 			},

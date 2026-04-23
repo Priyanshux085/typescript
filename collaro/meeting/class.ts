@@ -1,23 +1,24 @@
 import { Input } from "@collaro/utils/omit";
-import { 
-  IMeetingDTO, 
-  IWorkspaceMeetingDTO, 
-  TMeetingId, 
-  IMeetingStore,
-  MemoryMeetingStore,
-  TWorkspaceId,
-  IWorkspaceMeeting,
-  IParticipantStore,
-  ParticipantStore,
-  MemoryWorkspaceMeetingStore,
-  TeamMeetingDTO,
-  IParticipantDTO,
+import {
+	IMeetingDTO,
+	IWorkspaceMeetingDTO,
+	TMeetingId,
+	IMeetingStore,
+	MemoryMeetingStore,
+	TWorkspaceId,
+	IParticipantStore,
+	ParticipantStore,
+	MemoryWorkspaceMeetingStore,
+	TeamMeetingDTO,
+	IParticipantDTO,
 } from "./index";
 import { ID } from "@collaro/utils/generate";
-import { TMemberId } from "@collaro/workspace/member/interface";
-import { TUserId } from "@collaro/user";
+import { IMemberDTO, TMemberId } from "@collaro/workspace/role/member";
+import { IUserDTO, TUserId } from "@collaro/user";
 
-export type TMeetingInput<T> = Omit<Input<T>, "participants">
+export type TMeetingInput<T> = Omit<Input<T>, "participants"> & {
+	callerDetail: IMemberDTO | IUserDTO;
+};
 
 abstract class MeetingBase<T, TMeetingInput = T> {
   abstract createMeeting(input: TMeetingInput): T;
@@ -29,128 +30,144 @@ abstract class MeetingBase<T, TMeetingInput = T> {
 type PrivateMeetingDTO = IMeetingDTO<TUserId>;
 
 export class PrivateMeeting extends MeetingBase<PrivateMeetingDTO> {
-  store: IMeetingStore<TUserId> = new MemoryMeetingStore();
+	store: IMeetingStore<TUserId> = new MemoryMeetingStore();
 
-  constructor(public meeting: PrivateMeetingDTO) {
-    super();
-  }
+	constructor(public meeting: PrivateMeetingDTO) {
+		super();
+	}
 
-  override createMeeting(input: PrivateMeetingDTO): PrivateMeetingDTO {
-    this.store.save(input);
-    return input;
-  }
+	override createMeeting(
+		input: PrivateMeetingDTO & { callerDetail: IUserDTO }
+	): PrivateMeetingDTO {
+		this.store.save(input);
+		return input;
+	}
 
-  override getMeeting(id: TMeetingId): PrivateMeetingDTO | null {
-    const meeting = this.store.findById(id);
-    if (!meeting) {
-      return null;
-    }
-    return meeting as unknown as PrivateMeetingDTO;
-  }
+	override getMeeting(id: TMeetingId): PrivateMeetingDTO | null {
+		const meeting = this.store.findById(id);
+		if (!meeting) {
+			return null;
+		}
+		return meeting as unknown as PrivateMeetingDTO;
+	}
 
-  override deleteMeeting(id: TMeetingId): void {
-    this.store.delete(id);
-  }
+	override deleteMeeting(id: TMeetingId): void {
+		this.store.delete(id);
+	}
 
-  override updateMeeting(id: TMeetingId, data: Partial<PrivateMeetingDTO>): void {
-    this.store.update(id, data);
-  }
+	override updateMeeting(
+		id: TMeetingId,
+		data: Partial<PrivateMeetingDTO>
+	): void {
+		this.store.update(id, data);
+	}
 }
 
-export class TeamMeeting extends MeetingBase<IWorkspaceMeetingDTO, Input<TeamMeetingDTO>> implements IWorkspaceMeeting {
-  store: IMeetingStore<TMemberId> = new MemoryWorkspaceMeetingStore();
-  participantStore: IParticipantStore = new ParticipantStore();
-  meeting: IWorkspaceMeetingDTO = {} as IWorkspaceMeetingDTO;
+export class TeamMeeting extends MeetingBase<
+	IWorkspaceMeetingDTO,
+	Input<TeamMeetingDTO>
+> {
+	store: IMeetingStore<TMemberId> = MemoryWorkspaceMeetingStore.getInstance();
+	participantStore: IParticipantStore = new ParticipantStore();
+	meeting: IWorkspaceMeetingDTO = {} as IWorkspaceMeetingDTO;
 
-  private async findMemberById(id: TMemberId): Promise<TeamMeetingDTO | null> {
-    const participant = await this.participantStore.listParticipants(this.meeting.id)
-    
-    if (!participant) {
-      console.log(`Member with ID ${id} is not a participant of this meeting.`);
-      return null;
-    }
-    return {
-      ...this.meeting,
-      workspaceId: this.meeting.workspaceId,
-    } as TeamMeetingDTO;
-  }
+	private async findMemberById(id: TMemberId): Promise<TeamMeetingDTO | null> {
+		const participant = await this.participantStore.listParticipants(
+			this.meeting.id
+		);
 
-  override createMeeting(input: TMeetingInput<IWorkspaceMeetingDTO>): IWorkspaceMeetingDTO {
-    const Id = ID.meetingId();
+		if (!participant) {
+			console.log(`Member with ID ${id} is not a participant of this meeting.`);
+			return null;
+		}
+		return {
+			...this.meeting,
+			workspaceId: this.meeting.workspaceId,
+		} as TeamMeetingDTO;
+	}
 
-    // Check if meeting with the same ID already exists
-    const newMeeting: IWorkspaceMeetingDTO = {
-      id: Id,
-      title: input.title,
-      createdBy: input.createdBy,
-      workspaceId: input.workspaceId,
-      status: "Scheduled",
-      createdAt: new Date(),
-      description: input.description,
-      startTime: input.startTime,
-      endTime: null,
-      participants: {
-        [String(input.createdBy)]: input.createdBy
-      }
-    };
+	override createMeeting(input: Input<TeamMeetingDTO>): IWorkspaceMeetingDTO {
+		const Id = ID.meetingId();
 
-    // console.log(`Creating meeting with ID: ${newMeeting.id} and title: ${newMeeting.title}`);
-    
-    this.participantStore.addParticipant({
-      meetingId: newMeeting.id,
-      memberId: input.createdBy,
-      name: "Creator",
-      role: "admin",
-      joinedAt: new Date(),
-      leaveAt: null,
-    })
+		// Check if meeting with the same ID already exists
+		const newMeeting: IWorkspaceMeetingDTO = {
+			id: Id,
+			meetingType: input.meetingType,
+			title: input.title,
+			createdBy: input.createdBy,
+			workspaceId: input.workspaceId,
+			status: "Ended",
+			createdAt: new Date(),
+			description: input.description,
+			startTime: input.startTime,
+			endTime: null,
+			participants: {
+				[String(input.createdBy)]: String(input.createdBy),
+			},
+		};
 
-    this.store.save(newMeeting);
+		// console.log(`Creating meeting with ID: ${newMeeting.id} and title: ${newMeeting.title}`);
 
-    return newMeeting;
-  }
+		this.participantStore.addParticipant({
+			meetingId: newMeeting.id,
+			memberId: input.createdBy,
+			name: "Creator",
+			role: "admin",
+			joinedAt: new Date(),
+			leaveAt: null,
+		});
 
-  override deleteMeeting(id: TMeetingId): void {
-    this.store.delete(id);
-  }
+		this.store.save(newMeeting);
 
-  override getMeeting(id: TMeetingId): IWorkspaceMeetingDTO | null {
-    const meeting = this.store.findById(id);
+		return newMeeting;
+	}
 
-    if (!meeting) {
-      return null;
-    }
+	override deleteMeeting(id: TMeetingId): void {
+		this.store.delete(id);
+	}
 
-    return meeting as unknown as IWorkspaceMeetingDTO;
-  }
+	override getMeeting(id: TMeetingId): IWorkspaceMeetingDTO | null {
+		const meeting = this.store.findById(id);
 
-  override updateMeeting(id: TMeetingId, data: Partial<IWorkspaceMeetingDTO>): void {
-    this.store.update(id, data);
-  }
+		if (!meeting) {
+			return null;
+		}
 
-  joinMeeting(memberId: string, workspaceId: TWorkspaceId): void {
-    // check if member is already a participant
-    if (this.meeting.participants[memberId]) {
-      console.log(`Member ${memberId} is already a participant.`);
-      return;
-    }
+		return meeting as unknown as IWorkspaceMeetingDTO;
+	}
 
-    // check is the member belongs to the workspace
-    if (String(this.meeting.id) !== String(workspaceId)) {
-      console.log(`Member ${memberId} does not belong to workspace ${workspaceId}.`);
-      return;
-    }
+	override updateMeeting(
+		id: TMeetingId,
+		data: Partial<IWorkspaceMeetingDTO>
+	): void {
+		this.store.update(id, data);
+	}
 
-    console.log(`Member ${memberId} joined the meeting ${this.meeting.title}.`);
-  }
+	joinMeeting(memberId: string, workspaceId: TWorkspaceId): void {
+		// check if member is already a participant
+		if (this.meeting.participants[memberId]) {
+			console.log(`Member ${memberId} is already a participant.`);
+			return;
+		}
 
-  addParticipant(participant: IParticipantDTO): void {
-    this.updateMeeting(this.meeting.id, {
-      participants: {
-        [String(participant.memberId)]: participant.memberId
-      }
-    })
+		// check is the member belongs to the workspace
+		if (String(this.meeting.id) !== String(workspaceId)) {
+			console.log(
+				`Member ${memberId} does not belong to workspace ${workspaceId}.`
+			);
+			return;
+		}
 
-    this.participantStore.addParticipant(participant);
-  }
+		console.log(`Member ${memberId} joined the meeting ${this.meeting.title}.`);
+	}
+
+	addParticipant(participant: IParticipantDTO): void {
+		this.updateMeeting(this.meeting.id, {
+			participants: {
+				[participant.name]: String(participant.memberId),
+			},
+		});
+
+		this.participantStore.addParticipant(participant);
+	}
 }
