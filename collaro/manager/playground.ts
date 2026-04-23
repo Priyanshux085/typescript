@@ -108,6 +108,7 @@ async function playground() {
 		meetingType: "Instant",
 		description: "Weekly team sync-up meeting",
 		workspaceId: workspace.id,
+		callerDetail: workspace.ownerDetail,
 	});
 
 	console.log(
@@ -146,7 +147,7 @@ async function playground() {
 		wonderWoman.id
 	);
 
-  console.log("Meeting notifications for Batman", batmanNotifications);
+	console.log("Meeting notifications for Batman", batmanNotifications);
 	console.log("Meeting notifications for Wonder", wonderWomanNotifications);
 }
 

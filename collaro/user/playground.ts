@@ -1,11 +1,24 @@
-import { User } from "./class";
+import { User } from "./";
 
-const user = new User();
-const newUser = user.createUser({
-  name: "John Doe",
-  email: "john.doe@example.com",
-  password: "securepassword",
-  userName: "johndoe",
-})
+export const userExampleService = new User();
 
-console.log(newUser);
+export const batman = userExampleService.createUser({
+	name: "Bruce Wayne",
+	userName: "batman",
+	email: "bruce.wayne@example.com",
+	password: "darkknight123",
+});
+
+export const wonderWoman = userExampleService.createUser({
+	name: "Diana Prince",
+	userName: "wonderwoman",
+	email: "diana.prince@example.com",
+	password: "amazonian123",
+});
+
+export const superman = userExampleService.createUser({
+	name: "Clark Kent",
+	userName: "superman",
+	email: "clark.kent@example.com",
+	password: "kryptonian123",
+});

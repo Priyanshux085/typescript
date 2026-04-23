@@ -9,69 +9,121 @@ import { IUserDTO } from "@collaro/user";
 import { IWorkspaceDTO } from "@collaro/workspace";
 
 // const WorkspaceNotificationMessageMap: Map<string, string> = new Map([
-  //   ["workspace_created", "A new workspace has been created."],
-  //   ["workspace_updated", "A workspace has been updated."],
-  //   ["workspace_deleted", "A workspace has been deleted."],
-  //   ["workspace_joined", "You have joined a new workspace."],
-  //   ["workspace_left", "You have left a workspace."],
-  //   ["settings_updated", "Workspace settings have been updated."],
-  //   ["logo_updated", "Workspace logo has been updated."],
-  // ]);
-  
-type TWorkspaceNotificationType = "workspace_created" | "workspace_updated" | "workspace_deleted" | "workspace_joined" | "workspace_left" | "settings_updated" | "logo_updated";
+//   ["workspace_created", "A new workspace has been created."],
+//   ["workspace_updated", "A workspace has been updated."],
+//   ["workspace_deleted", "A workspace has been deleted."],
+//   ["workspace_joined", "You have joined a new workspace."],
+//   ["workspace_left", "You have left a workspace."],
+//   ["settings_updated", "Workspace settings have been updated."],
+//   ["logo_updated", "Workspace logo has been updated."],
+// ]);
+
+type TWorkspaceNotificationType =
+	| "workspace_created"
+	| "workspace_updated"
+	| "workspace_deleted"
+	| "workspace_joined"
+	| "workspace_left"
+	| "settings_updated"
+	| "logo_updated"
+	| "invite_sent";
 
 interface IWorkspaceNotificationDTO extends INotificationDTO {
-  workspaceName: IWorkspaceDTO["name"];
-  userName?: IUserDTO["name"];
-  type: TWorkspaceNotificationType;
+	workspaceName: IWorkspaceDTO["name"];
+	userName?: IUserDTO["name"];
+	type: TWorkspaceNotificationType;
 }
 
-function WorkspaceNotificationMessage(type: TWorkspaceNotificationType, workspaceName: string, userName?: string): string {
-  switch (type) {
-    case "workspace_created": 
-      return `A new Workspace ` + workspaceName + " has been created by You.";
-    case "workspace_updated":
-      return "Workspace " + workspaceName + " has been updated by " + userName + ".";
-    case "workspace_deleted":
-      return "Workspace " + workspaceName + " has been deleted.";
-    case "workspace_joined": 
-      return "User " + userName + " has joined the workspace " + workspaceName + ".";
-    case "workspace_left":
-      return "User " + userName + " has left the workspace " + workspaceName + ".";
-    case "settings_updated":
-      return "Settings for workspace " + workspaceName + " have been updated.";
-    case "logo_updated":
-      return "Logo for workspace " + workspaceName + " has been updated.";
-    default:
-      return "You have a new notification.";
-  }
+function WorkspaceNotificationMessage(
+	type: TWorkspaceNotificationType,
+	workspaceName: string,
+	userName?: string
+): string {
+	switch (type) {
+		case "workspace_created":
+			return `A new Workspace ` + workspaceName + " has been created by You.";
+		case "workspace_updated":
+			return (
+				"Workspace " + workspaceName + " has been updated by " + userName + "."
+			);
+		case "workspace_deleted":
+			return "Workspace " + workspaceName + " has been deleted.";
+		case "workspace_joined":
+			return (
+				"User " + userName + " has joined the workspace " + workspaceName + "."
+			);
+		case "workspace_left":
+			return (
+				"User " + userName + " has left the workspace " + workspaceName + "."
+			);
+		case "settings_updated":
+			return "Settings for workspace " + workspaceName + " have been updated.";
+		case "logo_updated":
+			return "Logo for workspace " + workspaceName + " has been updated.";
+		case "invite_sent":
+			return (
+				"A new member has been invited to the workspace " + workspaceName + "."
+			);
+		default:
+			return "You have a new notification.";
+	}
 }
 
-type TMemberNotificationType = "join_request" | "request_approved" | "request_rejected" | "role_changed" | "member_banned" | "member_removed";
+type TMemberNotificationType =
+	| "join_request"
+	| "request_approved"
+	| "request_rejected"
+	| "role_changed"
+	| "member_banned"
+	| "member_removed"
+	| "invite_sent"
+	| "invite_revoked";
 
 interface IMemberNotificationDTO extends INotificationDTO {
-  type: TMemberNotificationType;
-  userName: IUserDTO["name"];
-  workspaceName: IWorkspaceDTO["name"];
+	type: TMemberNotificationType;
+	userName: IUserDTO["name"];
+	workspaceName: IWorkspaceDTO["name"];
 }
 
-function MemberNotificationMessage(type: TMemberNotificationType, userName: string, workspaceName: string): string {
-  switch (type) {
-    case "join_request":
-      return "You have a new join request from " + userName + ".";
-    case "request_approved":
-      return "Your join request to the workspace " + workspaceName + " has been approved.";
-    case "request_rejected":
-      return "Your join request to the workspace " + workspaceName + " has been rejected.";
-    case "role_changed":
-      return "Your role in the workspace " + workspaceName + " has been changed.";
-    case "member_banned":
-      return "You have been banned from the workspace " + workspaceName + ".";
-    case "member_removed":
-      return "You have been removed from the workspace " + workspaceName + ".";
-    default:
-      return "You have a new notification.";
-  }
+function MemberNotificationMessage(
+	type: TMemberNotificationType,
+	userName: string,
+	workspaceName: string
+): string {
+	switch (type) {
+		case "join_request":
+			return "You have a new join request from " + userName + ".";
+		case "request_approved":
+			return (
+				"Your join request to the workspace " +
+				workspaceName +
+				" has been approved."
+			);
+		case "request_rejected":
+			return (
+				"Your join request to the workspace " +
+				workspaceName +
+				" has been rejected."
+			);
+		case "role_changed":
+			return (
+				"Your role in the workspace " + workspaceName + " has been changed."
+			);
+		case "member_banned":
+			return "You have been banned from the workspace " + workspaceName + ".";
+		case "member_removed":
+			return "You have been removed from the workspace " + workspaceName + ".";
+		case "invite_sent":
+			return "You have been invited to the workspace " + workspaceName + ".";
+		case "invite_revoked":
+			return (
+				"Your invitation to the workspace " +
+				workspaceName +
+				" has been revoked."
+			);
+		default:
+			return "You have a new notification.";
+	}
 }
 
 type ICreateWorkspaceNotificationInput = Omit<

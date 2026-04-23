@@ -13,6 +13,7 @@ import {
 	IWorkspaceMemberManager,
 	TMemberId,
 	MemberStore,
+	TCreateInviteInput,
 } from "@collaro/workspace/role/member";
 
 import { IWorkspaceDTO, IWorkspaceStore } from "../workspace/interface";
@@ -24,13 +25,19 @@ import {
 } from "../workspace/member-request/interface";
 import { RequestMember } from "../workspace/member-request/class";
 import { WorkspaceRoleManager as RoleManager } from "./workspace-role-manager";
-import { IRoleDTO } from "@collaro/workspace/role";
+import {
+	IRequestInvite,
+	IInviteDTO,
+} from "../workspace/workspace-invite/interface";
+import { InviteService } from "../workspace/workspace-invite/class";
+import { expirationTimeMap } from "@collaro/utils/time";
 
 export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 	private workspaceStore: IWorkspaceStore = MemoryWorkspaceStore.getInstance();
-	private memberStore: IMemberStore = new MemberStore();
+	private memberStore: IMemberStore = MemberStore.getInstance();
 	private notificationService: WorkspaceNotification = workspaceNotification;
 	private requestService: IRequestMember = new RequestMember();
+	private inviteService: IRequestInvite = new InviteService();
 	private user: IUser = new User();
 
 	private sorting = new MemberSorting();
@@ -249,21 +256,6 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			throw new Error("Member not found.");
 		}
 
-		// const roleManager = this.getRoleManager(
-		// 	workspaceDetail.id,
-		// 	workspaceDetail.subscription
-		// );
-		// const canUpdate = await roleManager.hasPermission(
-		// 	member.roleId,
-		// 	"edit_settings:workspace"
-		// );
-		// if (!canUpdate.hasPermission) {
-		// 	throw new Error(
-		// 		canUpdate.reason ||
-		// 			"Only workspace admins can update workspace details."
-		// 	);
-		// }
-
 		const dto: IWorkspaceDTO = {
 			...workspaceDetail,
 			...workspaceData,
@@ -309,28 +301,6 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			if (!approverDetails || !workspace) {
 				throw new Error("Approver or workspace not found.");
 			}
-
-			// const roleManager = this.getRoleManager(
-			// 	workspace.id,
-			// 	workspace.subscription
-			// );
-			// const canManage = await roleManager.hasPermission(
-			// 	approverDetails.roleId,
-			// 	"manage_roles:workspace"
-			// );
-			// if (!canManage.hasPermission) {
-			// 	throw new Error(
-			// 		canManage.reason ||
-			// 			"Approver does not have sufficient permissions to approve join requests."
-			// 	);
-			// }
-
-			// const result = await this.requestService.approveRequest(requestId);
-			// if (!result || !result.success) {
-			// 	throw new Error(
-			// 		`Failed to approve join request with ID: ${requestId}.`
-			// 	);
-			// }
 
 			return await this.joinWorkspace(request.workspaceId, request.userId);
 		} catch (error: unknown) {
@@ -411,9 +381,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		await this.removeMemberFromWorkspace(workspaceId, memberId, bannedBy);
 	}
 
-	async listMembers(
-		workspaceId: IWorkspaceDTO["id"]
-	): Promise<(IMemberDTO & { role: IRoleDTO })[]> {
+	async listMembers(workspaceId: IWorkspaceDTO["id"]): Promise<IMemberDTO[]> {
 		try {
 			const workspace = await this.findWorkspaceById(workspaceId);
 			if (!workspace) {
@@ -426,23 +394,7 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 			const list = await this.memberStore.list(workspaceId);
 			const members = this.sorting.sortByName(list, "asc");
 
-			const roles = await this.getRoleManager(
-				workspaceId,
-				workspace.subscription
-			).getRolesForWorkspace();
-
-			const roleMap = new Map<string, IRoleDTO>(
-				roles.map((role) => [String(role.id), role])
-			);
-
-			const result: (IMemberDTO & { role: IRoleDTO })[] = members.map(
-				(member) => ({
-					...member,
-					role: roleMap.get(String(member.roleId))!,
-				})
-			);
-
-			return result;
+			return members;
 		} catch (error) {
 			console.error(
 				`Error fetching members for workspace ID: ${workspaceId}.`,
@@ -489,32 +441,6 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 				throw new Error("Only workspace Owner and Admins can remove members.");
 			}
 		}
-
-		// const roleManager = this.getRoleManager(
-		// 	workspace.id,
-		// 	workspace.subscription
-		// );
-		// const targetRole = await roleManager.getMemberRole(memberId);
-		// if (targetRole?.name === "owner") {
-		// 	throw new Error("Workspace owner cannot be removed.");
-		// }
-
-		// if (removedBy) {
-		// 	const remover = await this.memberStore.findById(removedBy);
-		// 	if (!remover) {
-		// 		throw new Error("Requester not found.");
-		// 	}
-
-		// 	const canRemove = await roleManager.hasPermission(
-		// 		remover.roleId,
-		// 		"remove:member"
-		// 	);
-		// 	if (!canRemove.hasPermission) {
-		// 		throw new Error(
-		// 			canRemove.reason || "You do not have permission to remove members."
-		// 		);
-		// 	}
-		// }
 
 		await this.memberStore.delete(memberId);
 
@@ -599,5 +525,307 @@ export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 		workspaceId: IWorkspaceDTO["id"]
 	): Promise<IRequestMemberDTO[]> {
 		return this.requestService.listRequests(workspaceId);
+	}
+
+	async createInvite(input: TCreateInviteInput): Promise<IInviteDTO> {
+		try {
+			// Validate inviter has permission
+			const workspace = await this.findWorkspaceById(input.workspaceId);
+			if (!workspace) {
+				throw new Error(`Workspace with ID: ${input.workspaceId} not found.`);
+			}
+
+			const expirationDate = expirationTimeMap(input.expirationTime);
+
+			switch (input.type) {
+				case "email":
+					return await this.createEmailInvite(input.invitedEmail, {
+						...input,
+						expirationDate,
+						status: "pending",
+					});
+
+				case "userId":
+					return await this.createUserIdInvite(input.invitedUserId, {
+						...input,
+						expirationDate,
+						status: "pending",
+					});
+				default:
+					throw new Error("Invalid invite type.");
+			}
+		} catch (error: unknown) {
+			throw new Error(`Failed to create invite: ${(error as Error).message}`, {
+				cause: error,
+			});
+		}
+	}
+
+	private async createEmailInvite(
+		email: string,
+		inviteDTO: Input<IInviteDTO>
+	): Promise<IInviteDTO> {
+		try {
+			// Validate email format
+			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			if (!emailRegex.test(email)) {
+				throw new Error(`Invalid email format: ${email}`);
+			}
+
+			// Check workspace capacity
+			const workspace = await this.findWorkspaceById(inviteDTO.workspaceId);
+			if (!workspace) {
+				throw new Error(
+					`Workspace with ID: ${inviteDTO.workspaceId} not found.`
+				);
+			}
+
+			const currentMembers = await this.listMembers(inviteDTO.workspaceId);
+			SubscriptionEnforcer.enforceMemberAddition({
+				currentPlan: workspace.subscription,
+				currentMemberCount: currentMembers.length,
+			});
+
+			// For email invites, user doesn't need to have an account yet
+			const invite = await this.inviteService.createInvite({
+				invitedEmail: email,
+				...inviteDTO,
+			});
+
+			return invite;
+		} catch (error: unknown) {
+			throw new Error(
+				`Failed to create email invite: ${(error as Error).message}`,
+				{
+					cause: error,
+				}
+			);
+		}
+	}
+
+	private async createUserIdInvite(
+		userId: IUserDTO["id"],
+		inviteDTO: Input<IInviteDTO>
+	): Promise<IInviteDTO> {
+		try {
+			// Validate user exists (Collaro user)
+			const user = await this.user.getUser(userId);
+			if (!user) {
+				throw new Error(
+					`User with ID: ${userId} not found. User must have a Collaro account.`
+				);
+			}
+
+			// Check user is not already a member
+			const workspace = await this.findWorkspaceById(inviteDTO.workspaceId);
+			if (!workspace) {
+				throw new Error(
+					`Workspace with ID: ${inviteDTO.workspaceId} not found.`
+				);
+			}
+
+			const existingMember = await this.listMemberDetails({
+				userID: userId,
+				workspaceId: inviteDTO.workspaceId,
+			});
+			if (existingMember) {
+				throw new Error(
+					`User is already a member of workspace: ${workspace.name}`
+				);
+			}
+
+			// Check workspace capacity
+			const currentMembers = await this.listMembers(inviteDTO.workspaceId);
+			SubscriptionEnforcer.enforceMemberAddition({
+				currentPlan: workspace.subscription,
+				currentMemberCount: currentMembers.length,
+			});
+
+			const invite = await this.inviteService.createInvite({
+				invitedUserId: userId,
+				...inviteDTO,
+			});
+
+			// Send notification to Collaro user
+			await this.notificationService.createMemberNotification({
+				type: "invite_sent",
+				workspaceId: inviteDTO.workspaceId,
+				workspaceName: workspace.name,
+				userName: user.userName,
+				userId: userId,
+			});
+
+			return invite;
+		} catch (error: unknown) {
+			throw new Error(
+				`Failed to create user ID invite: ${(error as Error).message}`,
+				{
+					cause: error,
+				}
+			);
+		}
+	}
+
+	async acceptInvite(
+		inviteId: TRequestId,
+		acceptedByUserId: IUserDTO["id"]
+	): Promise<IMemberDTO> {
+		try {
+			// Get and validate invite
+			const invite = await this.inviteService.getInvite(inviteId);
+			if (!invite) {
+				throw new Error(`Invite with ID: ${inviteId} not found.`);
+			}
+
+			if (invite.status !== "pending") {
+				throw new Error(
+					`Invite is not pending. Current status: ${invite.status}`
+				);
+			}
+
+			// Check expiration
+			const isExpired = await this.inviteService.checkExpiration(invite);
+			if (isExpired) {
+				throw new Error("Invite has expired.");
+			}
+
+			// Validate userId matches invited user
+			if (!invite.invitedUserId) {
+				throw new Error(
+					"This invite is not for a userId. Use acceptInviteByEmail instead."
+				);
+			}
+
+			if (invite.invitedUserId !== acceptedByUserId) {
+				throw new Error("You cannot accept an invite sent to another user.");
+			}
+
+			// Join workspace
+			const member = await this.joinWorkspace(
+				invite.workspaceId,
+				acceptedByUserId
+			);
+
+			// Update invite status
+			await this.inviteService.acceptInvite(inviteId, acceptedByUserId);
+
+			// Assign role if not default member role
+			if (invite.role !== "member") {
+				const workspace = await this.findWorkspaceById(invite.workspaceId);
+				if (workspace) {
+					const roleManager = this.getRoleManager(
+						invite.workspaceId,
+						workspace.subscription
+					);
+					const owner = await this.getOwnerDetail(invite.workspaceId);
+					if (owner) {
+						await roleManager.assignRole(member.id, invite.role, owner.id);
+					}
+				}
+			}
+
+			// Send acceptance notifications
+			const user = await this.user.getUser(acceptedByUserId);
+			const workspace = await this.findWorkspaceById(invite.workspaceId);
+			if (user && workspace) {
+				await this.notificationService.createWorkspaceNotification({
+					type: "invite_sent",
+					userId: workspace.ownerId,
+					workspaceId: invite.workspaceId,
+					workspaceName: workspace.name,
+					userName: user.userName,
+					memberId: member.id,
+				});
+			}
+
+			return member;
+		} catch (error: unknown) {
+			throw new Error(`Error accepting invite: ${(error as Error).message}`, {
+				cause: error,
+			});
+		}
+	}
+
+	async acceptInviteByEmail(
+		inviteId: TRequestId,
+		email: string,
+		acceptedByUserId: IUserDTO["id"]
+	): Promise<IMemberDTO> {
+		try {
+			// Get and validate invite
+			const invite = await this.inviteService.getInvite(inviteId);
+			if (!invite) {
+				throw new Error(`Invite with ID: ${inviteId} not found.`);
+			}
+
+			// Validate email matches invite
+			if (!invite.invitedEmail || invite.invitedEmail !== email) {
+				throw new Error(
+					"Email mismatch. This invite was sent to a different email."
+				);
+			}
+
+			if (invite.status !== "pending") {
+				throw new Error(
+					`Invite is not pending. Current status: ${invite.status}`
+				);
+			}
+
+			// Check expiration
+			const isExpired = await this.inviteService.checkExpiration(invite);
+			if (isExpired) {
+				throw new Error("Invite has expired.");
+			}
+
+			// Verify user has created account (not just invite for email)
+			const user = await this.user.getUser(acceptedByUserId);
+			if (!user) {
+				throw new Error(
+					"You must create a Collaro account before accepting this invite."
+				);
+			}
+
+			// Verify email matches user account email
+			if (user.email !== email) {
+				throw new Error(
+					"Email mismatch. This invite was sent to a different email than your account."
+				);
+			}
+
+			// Join workspace
+			const member = await this.joinWorkspace(
+				invite.workspaceId,
+				acceptedByUserId
+			);
+
+			// Update invite status
+			await this.inviteService.acceptInviteByEmail(
+				inviteId,
+				email,
+				acceptedByUserId
+			);
+
+			// Send acceptance notifications
+			const workspace = await this.findWorkspaceById(invite.workspaceId);
+			if (user && workspace) {
+				await this.notificationService.createWorkspaceNotification({
+					type: "invite_sent",
+					userId: workspace.ownerId,
+					workspaceId: invite.workspaceId,
+					workspaceName: workspace.name,
+					userName: user.userName,
+					memberId: member.id,
+				});
+			}
+
+			return member;
+		} catch (error: unknown) {
+			throw new Error(
+				`Error accepting invite by email: ${(error as Error).message}`,
+				{
+					cause: error,
+				}
+			);
+		}
 	}
 }

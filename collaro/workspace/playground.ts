@@ -1,139 +1,35 @@
-import { WorkspaceMemberManager } from "@collaro/manager/workspace-manager";
-import { workspaceNotification } from "@collaro/notification";
-import { User } from "@collaro/user";
+import { WorkspaceMemberManager } from "@collaro/manager";
+import { batman, superman, wonderWoman } from "../user/playground";
+import { generateWorkspaceSlug } from "@collaro/utils";
 
-async function main() {
-  const workspaceManager = new WorkspaceMemberManager();
-  const userService = new User();
-  const notificationService = workspaceNotification
+export const workspaceService = new WorkspaceMemberManager();
 
-  // Create Users
-  const user01 = await userService.createUser({
-    name: "Tony Stark",
-    email: "tony@avengers.com",
-    password: "password123",
-    userName: "tony_stark"
-  });
+export const justiceLeagueWorkspace = await workspaceService.createWorkspace({
+	name: "Justice League",
+	description: "A team of superheroes",
+	ownerId: batman.id,
+	slug: generateWorkspaceSlug("Justice League"),
+	subscription: "enterprise",
+});
 
-  const user02 = await userService.createUser({
-    name: "Steve Rogers",
-    email: "captain@avengers.com",
-    password: "password123",
-    userName: "steve_rogers"
-  });
+await workspaceService.requestWorkspace(justiceLeagueWorkspace.id, superman.id);
 
-  const user03 = await userService.createUser({
-    name: "Bruce Wayne",
-    email: "bruce@dc.com",
-    password: "password123",
-    userName: "bruce_wayne"
-  });
+await workspaceService.requestWorkspace(
+	justiceLeagueWorkspace.id,
+	wonderWoman.id
+);
 
-  // Create Workspaces
-  const workspace = await workspaceManager.createWorkspace({
-		name: "Avengers",
-		description: "This is a test workspace",
-		ownerId: user01.id,
-		slug: "test-workspace",
-		subscription: "pro",
-	});
+const justiceLeagueRequests = await workspaceService.listRequests(
+	justiceLeagueWorkspace.id
+);
 
-  const workspace2 = await workspaceManager.createWorkspace({
-		name: "Justice League",
-		description: "Workspace for the Justice League team",
-		ownerId: user03.id,
-		slug: "justice_league",
-		subscription: "pro",
-	});
-
-  // Request to join workspace
-  await workspaceManager.requestWorkspace(workspace.id, user02.id);
-
-  const requests = await workspaceManager.listRequests(workspace.id);
-  if(!requests || !requests[0]) return;
-
-  const request_01 = requests[0];
-  
-  // Get member details
-  const member_01 = await workspaceManager.listMemberDetails({
-    userID: user01.id,
-    workspaceId: workspace.id
-  });
-
-  const member_03 = await workspaceManager.listMemberDetails({
-    userID: user03.id,
-    workspaceId: workspace2.id
-  })
-
-  await workspaceManager.requestWorkspace(workspace2.id, user01.id);
-  
-  // Approve join request
-  try {
-    await workspaceManager.approveJoinRequest(request_01.id, member_01!.id);
-    
-    const member_02 = await workspaceManager.listMemberDetails({
-      userID: user02.id,
-      workspaceId: workspace.id
-    })
-    
-    await workspaceManager.removeMemberFromWorkspace(workspace.id, member_02!.id);
-
-    // Updaete the workspace description to trigger a notification
-    await workspaceManager.updateWorkspace(workspace.id, { description: "Updated description to trigger notification" }, member_01!.id);
-    
-    const workspace_02_Requests = await workspaceManager.listRequests(workspace2.id);
-
-    await workspaceManager.approveJoinRequest(workspace_02_Requests[0]!.id, member_03!.id);
-
-    await workspaceManager.updateWorkspace(
-      workspace2.id, {
-        description: "Updated description to trigger notification for Justice League workspace",
-        name: "Justice League Updated",
-        logoUrl: "https://example.com/new-logo.png",
-      }, 
-      member_03!.id
-    );
-
-    const user_01_workspace_02_MemberDetails = await workspaceManager.listMemberDetails({
-      userID: user01.id,
-      workspaceId: workspace2.id
-    });
-
-    await workspaceManager.updateWorkspace(
-      workspace2.id, {
-        description: "Updated description again to trigger notification for Justice League workspace",
-        name: "Justice League Updated Again",
-      }, 
-      user_01_workspace_02_MemberDetails!.id
-    )
-  } catch (error) {
-    console.error("Error approving join request:", error);
-  }
-
-  // Fetch notifications AFTER approval
-  const notifications = await notificationService.listNotifications(user01.id);
-  console.log("Notification for Tony Stark: \n");
-  for (const notification of notifications) {
-    console.log("==> " + notification.message + "\n (Read: " + notification.read + ", Created At: " + 
-      notification.createdAt.toDateString() + ", Type: " + notification.type + " ) \n");
-  }
-  console.log("===================================\n");
-
-  const steveNotifications = await notificationService.listNotifications(user02.id);
-  console.log("Notification for Steve Rogers: \n");
-  for (const notification of steveNotifications) {
-    console.log("==> " + notification.message + "\n (Read: " + notification.read + ", Created At: " + 
-      notification.createdAt.toDateString() + ", Type: " + notification.type + " ) \n");
-  }
-
-  console.log("===================================\n");
-
-  const bruceNotifications = await notificationService.listNotifications(user03.id);
-  console.log("Notification for Bruce Wayne: \n");
-  for (const notification of bruceNotifications) {
-    console.log("==> " + notification.message + "\n (Read: " + notification.read + ", Created At: " + 
-      notification.createdAt.toDateString() + ", Type: " + notification.type + " ) \n");
-  }
+for (const request of justiceLeagueRequests) {
+	await workspaceService.approveJoinRequest(
+		request.id,
+		justiceLeagueWorkspace.ownerDetail.id
+	);
 }
 
-main().catch(console.error);
+export const justiceLeagueMembers = await workspaceService.listMembers(
+	justiceLeagueWorkspace.id
+);

@@ -1,4 +1,4 @@
-import { IMemberDTO } from "@collaro/workspace/member";
+import { IMemberDTO } from "@collaro/workspace/role/member";
 import { IUserDTO } from "@collaro/user";
 
 export interface ISorting {
