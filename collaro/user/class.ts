@@ -1,5 +1,5 @@
-import { ID } from "@collaro/utils/generate";
-import { IUser, IUserDTO, IUserStore, TCreateUserInput, TUserId } from "./interface";
+import { ID, TUserId } from "@collaro/utils";
+import { IUser, IUserDTO, IUserStore, TCreateUserInput } from "./interface";
 import { UserStore } from "./user-store";
 import {
 	INotificationDTO,

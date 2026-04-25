@@ -11,7 +11,6 @@ import {
 	IMemberDTO,
 	IMemberStore,
 	IWorkspaceMemberManager,
-	TMemberId,
 	MemberStore,
 	TCreateInviteInput,
 } from "@collaro/workspace/role/member";
@@ -21,7 +20,6 @@ import { MemoryWorkspaceStore } from "../workspace/stores/memory-workspace-store
 import {
 	IRequestMember,
 	IRequestMemberDTO,
-	TRequestId,
 } from "../workspace/member-request/interface";
 import { RequestMember } from "../workspace/member-request/class";
 import { WorkspaceRoleManager as RoleManager } from "./workspace-role-manager";
@@ -31,6 +29,7 @@ import {
 } from "../workspace/workspace-invite/interface";
 import { InviteService } from "../workspace/workspace-invite/class";
 import { expirationTimeMap } from "@collaro/utils/time";
+import { TMemberId, TRequestId } from "@collaro/utils";
 
 export class WorkspaceMemberManager implements IWorkspaceMemberManager {
 	private workspaceStore: IWorkspaceStore = MemoryWorkspaceStore.getInstance();

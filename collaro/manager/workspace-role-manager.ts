@@ -1,4 +1,4 @@
-import { ID } from "@collaro/utils";
+import { ID, TRoleId } from "@collaro/utils";
 import * as WorkspaceRole from "@collaro/workspace/role";
 import {
 	IWorkspaceDTO,
@@ -9,7 +9,7 @@ import { TSubscriptionPlan } from "@collaro/subscription";
 import {
 	IMemberDTO,
 	RoleAssignmentStore,
-} from "@collaro/workspace/role/member"; 
+} from "@collaro/workspace/role/member";
 
 function slugifyRoleKey(name: string): string {
 	return name
@@ -239,7 +239,7 @@ export class WorkspaceRoleManager
 	}
 
 	async updateCustomRole(
-		roleId: WorkspaceRole.TRoleId,
+		roleId: TRoleId,
 		updates: Partial<
 			Pick<
 				WorkspaceRole.IRoleDTO,
@@ -354,9 +354,7 @@ export class WorkspaceRoleManager
 		}
 	}
 
-	async getRoleByID(
-		roleId: WorkspaceRole.TRoleId
-	): Promise<WorkspaceRole.IRoleDTO | null> {
+	async getRoleByID(roleId: TRoleId): Promise<WorkspaceRole.IRoleDTO | null> {
 		try {
 			const roleDTO = await this.store.findById(roleId);
 			return roleDTO ?? null;
@@ -387,7 +385,7 @@ export class WorkspaceRoleManager
 	}
 
 	async hasPermission(
-		roleId: WorkspaceRole.TRoleId,
+		roleId: TRoleId,
 		permission: WorkspaceRole.TPermission
 	): Promise<WorkspaceRole.IPermissionValidationResult> {
 		const role = await this.store.findById(roleId);
@@ -408,7 +406,7 @@ export class WorkspaceRoleManager
 	}
 
 	async hasAnyPermission(
-		roleId: WorkspaceRole.TRoleId,
+		roleId: TRoleId,
 		permissions: readonly WorkspaceRole.TPermission[]
 	): Promise<boolean> {
 		const role = await this.store.findById(roleId);
@@ -425,7 +423,7 @@ export class WorkspaceRoleManager
 	}
 
 	async hasAllPermissions(
-		roleId: WorkspaceRole.TRoleId,
+		roleId: TRoleId,
 		permissions: readonly WorkspaceRole.TPermission[]
 	): Promise<boolean> {
 		const role = await this.store.findById(roleId);
@@ -634,8 +632,8 @@ export class WorkspaceRoleManager
 	}
 
 	async validateInheritance(
-		roleId: WorkspaceRole.TRoleId,
-		parentRoleId: WorkspaceRole.TRoleId
+		roleId: TRoleId,
+		parentRoleId: TRoleId
 	): Promise<WorkspaceRole.IInheritanceValidationResult> {
 		const role = await this.store.findById(roleId);
 		if (!role) {

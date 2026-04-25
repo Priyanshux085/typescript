@@ -1,7 +1,6 @@
 import { INotificationDTO, INotificationStore } from "@collaro/notification";
-import { BRAND } from "@collaro/utils/brand";
+import { TUserId } from "@collaro/utils";
 
-export type TUserId = BRAND<"UserId">;
 export type TCreateUserInput = Omit<IUserDTO, "id" | "createdAt" | "updatedAt">;
 
 export interface IUserDTO {
