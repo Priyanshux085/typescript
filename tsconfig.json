@@ -7,16 +7,17 @@
 		"baseUrl": ".",
 		"outDir": "./dist",
 		"moduleResolution": "bundler",
-		
+
 		"paths": {
 			"@/*": ["src/box/*"],
 			"@box": ["src/box/index.ts"],
 			"game/*": ["factory-pattern/game/*"],
-			"@collaro/*": ["collaro/*"],
+			"@collaro/*": ["collaro/*"]
 		},
-		
+
 		// Bundler mode
 		"module": "esnext",
+		"jsx": "react-jsx",
 		"target": "ES2020",
 		"noEmit": true,
 		"strict": true,
@@ -30,7 +31,7 @@
 		// Some stricter flags (disabled by default)
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
-		"noPropertyAccessFromIndexSignature": false,
+		"noPropertyAccessFromIndexSignature": false
 	},
 	"include": ["src/", "factory-pattern/", "collaro/"],
 	"exclude": ["node_modules/", "dist/"]

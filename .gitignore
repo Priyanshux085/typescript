@@ -38,3 +38,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .agents
 .agent
 skills-lock.json
+
+# env files
+.env.development
+.env.production
+
+*/**/env.ts
