@@ -1,7 +1,6 @@
-import { IMeetingDTO, meetingStatus, TMeetingId } from "../interface";
+import { IMeetingDTO, meetingStatus } from "../interface";
 import { IMeetingStore } from ".";
-import { TUserId } from "@collaro/user";
-import { TMemberId } from "@collaro/workspace/role/member";
+import { TUserId, TMeetingId, TMemberId } from "@collaro/utils";
 
 export class MemoryMeetingStore implements IMeetingStore<TUserId> {
 	private meetings: IMeetingDTO<TUserId>[] = [];

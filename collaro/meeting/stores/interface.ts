@@ -1,7 +1,8 @@
-import { IMemberDTO, TMemberId } from "@collaro/workspace/role/member";
-import { IMeetingDTO, meetingStatus, TMeetingId } from "..";
+import { IMemberDTO } from "@collaro/workspace/role/member";
+import { IMeetingDTO, meetingStatus } from "..";
 import { Input } from "@collaro/utils/omit";
 import { IRoleDTO } from "@collaro/workspace/role";
+import { TMeetingId, TMemberId } from "@collaro/utils";
 
 export interface IMeetingStore<T> {
 	save(meeting: IMeetingDTO<T>): Promise<void>;

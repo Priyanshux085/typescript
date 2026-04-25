@@ -1,7 +1,6 @@
 import { IMemberDTO } from "@collaro/workspace/role/member";
-import { TMeetingId } from "../interface";
 import { IParticipantDTO, IParticipantStore } from "./index";
-import { Input } from "@collaro/utils/omit";
+import { Input, TMeetingId } from "@collaro/utils";
 
 const localStorage: IParticipantDTO[] = [];
 
