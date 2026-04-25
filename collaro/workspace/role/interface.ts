@@ -1,9 +1,7 @@
 import { TSubscriptionPlan } from "@collaro/subscription";
-import { BRAND } from "@collaro/utils/brand";
 import { IWorkspaceDTO } from "../interface";
 import { IMemberDTO } from "./member/interface";
-
-export type TRoleId = BRAND<"RoleId">;
+import { TRoleId } from "@collaro/utils";
 
 export type TPermissionAction =
 	| "create"
@@ -62,12 +60,18 @@ export const ROLE_PERMISSION_GROUPS: Readonly<IRolePermissionGroupMap> = {
 		"update:meeting",
 		"delete:meeting",
 	] as const,
-	analytics: ["view_analytics:workspace_analytics", "export_data:member_data", "export_data:meeting_data"] as const,
+	analytics: [
+		"view_analytics:workspace_analytics",
+		"export_data:member_data",
+		"export_data:meeting_data",
+	] as const,
 	billing: ["manage_billing:workspace"] as const,
 	data_access: ["export_data:member_data", "export_data:meeting_data"] as const,
 };
 
-export const PREDEFINED_ROLE_PERMISSIONS: Readonly<Record<TPredefinedRoleKey, readonly TPermission[]>> = {
+export const PREDEFINED_ROLE_PERMISSIONS: Readonly<
+	Record<TPredefinedRoleKey, readonly TPermission[]>
+> = {
 	owner: [
 		...ROLE_PERMISSION_GROUPS.member_management,
 		...ROLE_PERMISSION_GROUPS.workspace_admin,
@@ -165,7 +169,9 @@ export interface IBulkRoleAssignmentResult {
 export interface IBulkRoleUpdateRequest {
 	readonly workspaceId: IWorkspaceDTO["id"];
 	readonly roleIds: readonly TRoleId[];
-	readonly updates: Partial<Pick<IRoleDTO, "name" | "description" | "permissions" | "parentRoleId">>;
+	readonly updates: Partial<
+		Pick<IRoleDTO, "name" | "description" | "permissions" | "parentRoleId">
+	>;
 }
 
 export interface IBulkRoleDeleteRequest {
@@ -183,7 +189,9 @@ export interface IRoleFeatureLimits {
 	readonly allowedPermissions: readonly TPermission[];
 }
 
-export const ROLE_LIMITS_BY_SUBSCRIPTION: Readonly<Record<TSubscriptionPlan, IRoleFeatureLimits>> = {
+export const ROLE_LIMITS_BY_SUBSCRIPTION: Readonly<
+	Record<TSubscriptionPlan, IRoleFeatureLimits>
+> = {
 	free: {
 		canCreateCustomRoles: false,
 		canUseInheritance: false,

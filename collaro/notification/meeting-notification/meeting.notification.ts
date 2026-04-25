@@ -1,7 +1,11 @@
 import { IUserDTO } from "@collaro/user";
-import { INotification, INotificationDTO, INotificationStore, TNotificationId } from "../interface";
+import {
+	INotification,
+	INotificationDTO,
+	INotificationStore,
+} from "../interface";
 import { notificationStore } from "../notification-store";
-import { ID } from "@collaro/utils/generate";
+import { ID, TNotificationId } from "@collaro/utils";
 
 type TNotification = "meeting_created" | "meeting_updated" | "meeting_cancelled" | "meeting_reminder" | "meeting_rescheduled";
  

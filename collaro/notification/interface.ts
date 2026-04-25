@@ -1,9 +1,7 @@
 import { IMemberDTO } from "@collaro/workspace/role/member";
 import { IUserDTO } from "@collaro/user";
-import { BRAND } from "@collaro/utils/brand";
 import { IWorkspaceDTO } from "@collaro/workspace";
-
-export type TNotificationId = BRAND<"notification_id">;
+import { TNotificationId } from "@collaro/utils";
 
 export interface INotificationDTO {
 	id: TNotificationId;

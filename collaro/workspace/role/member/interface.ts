@@ -1,11 +1,9 @@
 import { IUserDTO } from "@collaro/user";
 import { Input } from "@collaro/utils/omit";
-import { IWorkspaceDTO, TRequestId } from "@collaro/workspace";
-import { BRAND } from "@collaro/utils/brand";
+import { IWorkspaceDTO } from "@collaro/workspace";
 import { IInviteDTO } from "@collaro/workspace/workspace-invite";
 import { expirationTimeMap } from "@collaro/utils/time";
-
-export type TMemberId = BRAND<"MemberId">;
+import { TMemberId, TRequestId } from "@collaro/utils";
 
 export type TRole = "owner" | "admin" | "member";
 export type TOwnerRole = "owner";

@@ -1,4 +1,5 @@
-import { IWorkspaceDTO, IWorkspaceStore, TWorkspaceId } from "./../interface";
+import { TWorkspaceId } from "@collaro/utils";
+import { IWorkspaceDTO, IWorkspaceStore } from "./../interface";
 
 export class MemoryWorkspaceStore implements IWorkspaceStore {
 	private static instance: MemoryWorkspaceStore;

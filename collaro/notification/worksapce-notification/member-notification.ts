@@ -1,6 +1,7 @@
 import { ID } from "@collaro/utils/generate";
-import { INotificationDTO, INotificationStore, TNotificationId } from "../interface";
+import { INotificationDTO, INotificationStore } from "../interface";
 import { notificationStore } from "../notification-store";
+import { TNotificationId } from "@collaro/utils";
 
 type NotificationType = "join_request" | "approve_request" | "workspace_update" | "general";
 
