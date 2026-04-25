@@ -1,13 +1,11 @@
 import { IUserDTO } from "@collaro/user";
-import { BRAND } from "@collaro/utils/brand";
 import { TSubscriptionPlan } from "@collaro/subscription";
-
-export type TWorkspaceId = BRAND<"WorkspaceId">;
+import { TWorkspaceId } from "@collaro/utils";
 
 /**
- * IWorkspaceDTO represents the data transfer object for a workspace, 
+ * IWorkspaceDTO represents the data transfer object for a workspace,
  * containing properties such as id, name, description, createdAt, updatedAt, and subscription plan.
- * 
+ *
  * The subscription property is readonly and controls member capacity limits.
  * Only workspace owner can upgrade the subscription plan (no downgrades allowed).
  */
@@ -42,9 +40,9 @@ export interface IWorkspace {
 }
 
 export interface IWorkspaceStore {
-  save(workspace: IWorkspaceDTO): Promise<void>;
-  findById(id: TWorkspaceId): Promise<IWorkspaceDTO | null>;
-  update(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): Promise<void>;
-  delete(id: TWorkspaceId): Promise<void>;
-  list(): Promise<IWorkspaceDTO[]>;
+	save(workspace: IWorkspaceDTO): Promise<void>;
+	findById(id: TWorkspaceId): Promise<IWorkspaceDTO | null>;
+	update(id: TWorkspaceId, workspace: Partial<IWorkspaceDTO>): Promise<void>;
+	delete(id: TWorkspaceId): Promise<void>;
+	list(): Promise<IWorkspaceDTO[]>;
 }
