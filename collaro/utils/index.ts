@@ -1,4 +1,4 @@
-export * from "./brand";
+export * from "./type";
 
 export * from "./generate";
 

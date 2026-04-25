@@ -1,17 +1,16 @@
-import { ID } from "@collaro/utils/generate";
+import { ID, TRequestId } from "@collaro/utils";
 import {
 	IMemberRequestStore,
 	InputRequestMemberDTO,
 	IRequestMember,
 	IRequestMemberDTO,
 	returnDTO,
-	TRequestId,
 } from "./interface";
 import { memberRequestStore } from "./store";
 import { IWorkspaceDTO } from "../interface";
 
 /**
- * The RequestMember class is responsible for handling member join requests for a workspace. 
+ * The RequestMember class is responsible for handling member join requests for a workspace.
  * It provides methods to create a new join request, retrieve an existing request by its ID, approve a request, and reject a request.
  * The class interacts with the IMemberRequestStore to persist and manage the join requests.
  */

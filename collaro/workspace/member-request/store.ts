@@ -1,5 +1,10 @@
 import { INotificationStore } from "@collaro/notification";
-import { IMemberRequestStore, IRequestMemberDTO, MemberRequestParams, TRequestId } from "./interface";
+import {
+	IMemberRequestStore,
+	IRequestMemberDTO,
+	MemberRequestParams,
+} from "./interface";
+import { TRequestId } from "@collaro/utils";
 
 const globalRequestMember: IRequestMemberDTO[] = [];
 

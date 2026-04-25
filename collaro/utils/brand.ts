@@ -1,1 +1,0 @@
-export type BRAND<K extends string> = {  __brand: K; };

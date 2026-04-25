@@ -1,9 +1,7 @@
 import { IUserDTO } from "@collaro/user";
-import { BRAND } from "@collaro/utils/brand";
 import { IWorkspaceDTO } from "../interface";
 import { INotificationStore } from "@collaro/notification";
-
-export type TRequestId = BRAND<"RequestId">;
+import { TRequestId } from "@collaro/utils";
 
 export type DEFAULT_MEMBER_ROLE = "member";
 
@@ -23,9 +21,9 @@ export interface IRequestMemberDTO {
 export type Input<T> = Omit<T, "id" | "createdAt" | "updatedAt">;
 
 export type returnDTO = {
-  success: boolean;
-  message: string;
-}
+	success: boolean;
+	message: string;
+};
 
 export type InputRequestMemberDTO = Omit<
 	IRequestMemberDTO,
@@ -45,19 +43,19 @@ export interface IRequestMember {
 }
 
 export type MemberRequestParams = {
-  query: {
-    workspaceId?: IWorkspaceDTO["id"];
-    userId?: IUserDTO["id"];
-  }
-}
+	query: {
+		workspaceId?: IWorkspaceDTO["id"];
+		userId?: IUserDTO["id"];
+	};
+};
 
 // Store interface for managing member join requests.
 export interface IMemberRequestStore {
-  notification: INotificationStore;
-  
-  save(request: IRequestMemberDTO): Promise<void>;
-  findById(id: TRequestId): Promise<IRequestMemberDTO | null>;
-  update(id: TRequestId, request: Partial<IRequestMemberDTO>): Promise<void>;
-  list(): Promise<IRequestMemberDTO[]>;
-  query(params: MemberRequestParams): Promise<IRequestMemberDTO[]>;
+	notification: INotificationStore;
+
+	save(request: IRequestMemberDTO): Promise<void>;
+	findById(id: TRequestId): Promise<IRequestMemberDTO | null>;
+	update(id: TRequestId, request: Partial<IRequestMemberDTO>): Promise<void>;
+	list(): Promise<IRequestMemberDTO[]>;
+	query(params: MemberRequestParams): Promise<IRequestMemberDTO[]>;
 }
