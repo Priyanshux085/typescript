@@ -4,6 +4,16 @@ import { TUserId, TMeetingId, TMemberId } from "@collaro/utils";
 
 export class MemoryMeetingStore implements IMeetingStore<TUserId> {
 	private meetings: IMeetingDTO<TUserId>[] = [];
+	private constructor() {}
+
+	private static instance: MemoryMeetingStore;
+
+	static getInstance(): MemoryMeetingStore {
+		if (!MemoryMeetingStore.instance) {
+			MemoryMeetingStore.instance = new MemoryMeetingStore();
+		}
+		return MemoryMeetingStore.instance;
+	}
 
 	save(meeting: IMeetingDTO<TUserId>): Promise<void> {
 		this.meetings.push(meeting);

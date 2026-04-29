@@ -5,8 +5,6 @@ const params: TStreamClientParams = [config.apiKey, config.secret];
 
 export const streamClient = new StreamClient(...params);
 
-export const secondStreamClient = new StreamClient(...params);
-
 // Client-side utilities
 export type TClientStreamParams = {
   apiKey: string;

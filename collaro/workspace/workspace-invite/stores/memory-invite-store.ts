@@ -1,6 +1,5 @@
+import { TUserId, TWorkspaceId } from "@collaro/utils";
 import { IInviteStore, IInviteDTO, TInviteId } from "../interface";
-import { TUserId } from "@collaro/user";
-import { TWorkspaceId } from "@collaro/workspace/interface";
 
 export class MemoryInviteStore implements IInviteStore {
 	private store = new Map<TInviteId, IInviteDTO>();

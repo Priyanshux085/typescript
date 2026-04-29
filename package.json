@@ -31,6 +31,7 @@
 		"typescript": "^6.0.3"
 	},
 	"dependencies": {
+		"@polar-sh/sdk": "^0.47.0",
 		"@stream-io/node-sdk": "^0.7.55",
 		"@stream-io/video-react-sdk": "^1.35.2",
 		"@vapi-ai/server-sdk": "^1.2.0"

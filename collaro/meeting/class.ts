@@ -3,10 +3,7 @@ import {
 	IMeetingDTO,
 	IWorkspaceMeetingDTO,
 	IMeetingStore,
-	MemoryMeetingStore,
 	IParticipantStore,
-	ParticipantStore,
-	MemoryWorkspaceMeetingStore,
 	TeamMeetingDTO,
 	IParticipantDTO,
 } from "./index";
@@ -19,159 +16,288 @@ import {
 } from "@collaro/utils";
 import { IMemberDTO } from "@collaro/workspace/role/member";
 import { IUserDTO } from "@collaro/user";
+import { inject, Injectable } from "@collaro/di";
 
 export type TMeetingInput<T> = Omit<Input<T>, "participants"> & {
 	callerDetail: IMemberDTO | IUserDTO;
 };
 
 abstract class MeetingBase<T, TMeetingInput = T> {
-  abstract createMeeting(input: TMeetingInput): T;
-  abstract getMeeting(id: TMeetingId): T | null;
-  abstract updateMeeting(id: TMeetingId, data: Partial<T>): void;
-  abstract deleteMeeting(id: TMeetingId): void;
+	abstract createMeeting(input: TMeetingInput): T;
+	abstract getMeeting(id: TMeetingId): T | null;
+	abstract updateMeeting(id: TMeetingId, data: Partial<T>): void;
+	abstract deleteMeeting(id: TMeetingId): void;
 }
 
 type PrivateMeetingDTO = IMeetingDTO<TUserId>;
 
+@Injectable()
 export class PrivateMeeting extends MeetingBase<PrivateMeetingDTO> {
-	store: IMeetingStore<TUserId> = new MemoryMeetingStore();
+	store: IMeetingStore<TUserId>;
+	meeting: PrivateMeetingDTO = {} as PrivateMeetingDTO;
 
-	constructor(public meeting: PrivateMeetingDTO) {
+	constructor() {
 		super();
+		this.store = inject<IMeetingStore<TUserId>>("MemoryMeetingStore");
 	}
 
-	override createMeeting(
+	createMeeting(
 		input: PrivateMeetingDTO & { callerDetail: IUserDTO }
 	): PrivateMeetingDTO {
+		if (input.startTime < new Date()) {
+			throw new Error("Cannot create a meeting in the past");
+		}
+
 		this.store.save(input);
+		this.meeting = input;
 		return input;
 	}
 
-	override getMeeting(id: TMeetingId): PrivateMeetingDTO | null {
+	getMeeting(id: TMeetingId): PrivateMeetingDTO | null {
 		const meeting = this.store.findById(id);
 		if (!meeting) {
 			return null;
 		}
-		return meeting as unknown as PrivateMeetingDTO;
+		this.meeting = meeting as unknown as PrivateMeetingDTO;
+		return this.meeting;
 	}
 
-	override deleteMeeting(id: TMeetingId): void {
+	deleteMeeting(id: TMeetingId): void {
+		const meeting = this.getMeeting(id);
+		if (meeting && meeting.status !== "Ended") {
+			throw new Error("Cannot delete an active or scheduled meeting");
+		}
 		this.store.delete(id);
+		this.meeting = {} as PrivateMeetingDTO;
 	}
 
-	override updateMeeting(
+	updateMeeting(
 		id: TMeetingId,
 		data: Partial<PrivateMeetingDTO>
 	): void {
+		const current = this.getMeeting(id);
+		if (current) {
+			if (data.status && current.status === "Ended" && data.status !== "Ended") {
+				throw new Error("Cannot reopen an ended meeting");
+			}
+		}
 		this.store.update(id, data);
+	}
+
+	canJoin(userId: TUserId): boolean {
+		return this.meeting.createdBy === userId ||
+			Object.values(this.meeting.participants).includes(String(userId));
+	}
+
+	getDuration(): number | null {
+		if (!this.meeting.startTime || !this.meeting.endTime) {
+			return null;
+		}
+		return this.meeting.endTime.getTime() - this.meeting.startTime.getTime();
 	}
 }
 
+@Injectable()
 export class TeamMeeting extends MeetingBase<
 	IWorkspaceMeetingDTO,
 	Input<TeamMeetingDTO>
 > {
-	store: IMeetingStore<TMemberId> = MemoryWorkspaceMeetingStore.getInstance();
-	participantStore: IParticipantStore = new ParticipantStore();
+	store: IMeetingStore<TMemberId>;
+	participantStore: IParticipantStore;
 	meeting: IWorkspaceMeetingDTO = {} as IWorkspaceMeetingDTO;
+	private workspaceId: TWorkspaceId = {} as TWorkspaceId;
 
-	private async findMemberById(id: TMemberId): Promise<TeamMeetingDTO | null> {
-		const participant = await this.participantStore.listParticipants(
-			this.meeting.id
-		);
-
-		if (!participant) {
-			console.log(`Member with ID ${id} is not a participant of this meeting.`);
-			return null;
-		}
-		return {
-			...this.meeting,
-			workspaceId: this.meeting.workspaceId,
-		} as TeamMeetingDTO;
+	constructor() {
+		super();
+		this.store = inject<IMeetingStore<TMemberId>>("MemoryWorkspaceMeetingStore");
+		this.participantStore = inject<IParticipantStore>("ParticipantStore");
 	}
 
-	override createMeeting(input: Input<TeamMeetingDTO>): IWorkspaceMeetingDTO {
-		const Id = ID.meetingId();
+	createMeeting(input: Input<TeamMeetingDTO> & { callerDetail: IMemberDTO }): IWorkspaceMeetingDTO {
+		const meetingId = ID.meetingId();
 
-		// Check if meeting with the same ID already exists
+		if (!input.title || input.title.trim().length === 0) {
+			throw new Error("Meeting title is required");
+		}
+
+		if (input.startTime && input.startTime < new Date()) {
+			throw new Error("Cannot create a meeting in the past");
+		}
+
 		const newMeeting: IWorkspaceMeetingDTO = {
-			id: Id,
+			id: meetingId,
 			meetingType: input.meetingType,
 			title: input.title,
 			createdBy: input.createdBy,
 			workspaceId: input.workspaceId,
-			status: "Ended",
+			status: "Not Started",
 			createdAt: new Date(),
-			description: input.description,
-			startTime: input.startTime,
+			description: input.description || "",
+			startTime: input.startTime || new Date(),
 			endTime: null,
-			participants: {
-				[String(input.createdBy)]: String(input.createdBy),
-			},
+			participants: {},
 		};
-
-		// console.log(`Creating meeting with ID: ${newMeeting.id} and title: ${newMeeting.title}`);
 
 		this.participantStore.addParticipant({
 			meetingId: newMeeting.id,
 			memberId: input.createdBy,
-			name: "Creator",
+			name: input.callerDetail?.name || "Creator",
 			role: "admin",
 			joinedAt: new Date(),
 			leaveAt: null,
 		});
 
+		newMeeting.participants = {
+			[String(input.createdBy)]: input.callerDetail?.name || "Creator",
+		};
+
 		this.store.save(newMeeting);
+		this.meeting = newMeeting;
+		this.workspaceId = input.workspaceId;
 
 		return newMeeting;
 	}
 
-	override deleteMeeting(id: TMeetingId): void {
+	deleteMeeting(id: TMeetingId): void {
+		const meeting = this.getMeeting(id);
+		if (meeting && meeting.status === "Active") {
+			throw new Error("Cannot delete an active meeting. End it first.");
+		}
+
+		this.participantStore.removeParticipant(id);
 		this.store.delete(id);
+
+		if (this.meeting.id === id) {
+			this.meeting = {} as IWorkspaceMeetingDTO;
+		}
 	}
 
-	override getMeeting(id: TMeetingId): IWorkspaceMeetingDTO | null {
+	getMeeting(id: TMeetingId): IWorkspaceMeetingDTO | null {
 		const meeting = this.store.findById(id);
-
 		if (!meeting) {
 			return null;
 		}
-
-		return meeting as unknown as IWorkspaceMeetingDTO;
+		this.meeting = meeting as unknown as IWorkspaceMeetingDTO;
+		return this.meeting;
 	}
 
-	override updateMeeting(
+	updateMeeting(
 		id: TMeetingId,
 		data: Partial<IWorkspaceMeetingDTO>
 	): void {
+		const current = this.getMeeting(id);
+		if (current && data.status) {
+			this.validateStatusTransition(current.status, data.status);
+			if (data.startTime && data.startTime < new Date()) {
+				throw new Error("Cannot set meeting start time to the past");
+			}
+		}
+
 		this.store.update(id, data);
+
+		if (this.meeting.id === id) {
+			this.meeting = { ...this.meeting, ...data };
+		}
 	}
 
-	joinMeeting(memberId: string, workspaceId: TWorkspaceId): void {
-		// check if member is already a participant
-		if (this.meeting.participants[memberId]) {
+	private validateStatusTransition(current: string, next: string): void {
+		const validTransitions: Record<string, string[]> = {
+			"Not Started": ["Active", "Cancelled"],
+			"Active": ["Ended", "Cancelled"],
+			"Ended": [],
+			"Cancelled": [],
+		};
+
+		const allowed = validTransitions[current] || [];
+		if (!allowed.includes(next)) {
+			throw new Error(`Invalid status transition from ${current} to ${next}`);
+		}
+	}
+
+	joinMeeting(memberId: TMemberId, workspaceId: TWorkspaceId): void {
+		if (this.meeting.participants[memberId as any]) {
 			console.log(`Member ${memberId} is already a participant.`);
 			return;
 		}
 
-		// check is the member belongs to the workspace
-		if (String(this.meeting.id) !== String(workspaceId)) {
-			console.log(
-				`Member ${memberId} does not belong to workspace ${workspaceId}.`
-			);
-			return;
+		if (String(this.meeting.workspaceId) !== String(workspaceId)) {
+			throw new Error(`Member ${memberId} does not belong to workspace ${workspaceId}.`);
 		}
 
+		if (this.meeting.status !== "Active" && this.meeting.status !== "Not Started") {
+			throw new Error(`Cannot join meeting with status: ${this.meeting.status}`);
+		}
+
+		const participant: IParticipantDTO = {
+			meetingId: this.meeting.id,
+			memberId: memberId,
+			name: `Member ${memberId}`,
+			role: "member",
+			joinedAt: new Date(),
+			leaveAt: null,
+		};
+
+		this.participantStore.addParticipant(participant);
+
+		this.updateMeeting(this.meeting.id, {
+			participants: {
+				...this.meeting.participants,
+				[memberId as any]: `Member ${memberId}`,
+			},
+		});
+
 		console.log(`Member ${memberId} joined the meeting ${this.meeting.title}.`);
+	}
+
+	leaveMeeting(memberId: TMemberId): void {
+		if (!this.meeting.participants[memberId as any]) {
+			throw new Error(`Member ${memberId} is not a participant of this meeting.`);
+		}
+
+		const participant = {
+			meetingId: this.meeting.id,
+			memberId: memberId,
+			name: this.meeting.participants[memberId as any],
+			role: "member" as const,
+			joinedAt: new Date(),
+			leaveAt: new Date(),
+		};
+
+		this.participantStore.addParticipant(participant);
+
+		const updatedParticipants = { ...this.meeting.participants };
+		delete (updatedParticipants as any)[memberId];
+
+		this.updateMeeting(this.meeting.id, {
+			participants: updatedParticipants,
+		});
 	}
 
 	addParticipant(participant: IParticipantDTO): void {
 		this.updateMeeting(this.meeting.id, {
 			participants: {
-				[participant.name]: String(participant.memberId),
+				...this.meeting.participants,
+				[participant.memberId as any]: participant.name,
 			},
 		});
 
 		this.participantStore.addParticipant(participant);
+	}
+
+	async getMeetingStats(): Promise<{
+		participantCount: number;
+		duration: number | null;
+		isActive: boolean;
+	}> {
+		const participants = await this.participantStore.listParticipants(this.meeting.id);
+		const duration = this.meeting.endTime
+			? this.meeting.endTime.getTime() - this.meeting.startTime.getTime()
+			: null;
+
+		return {
+			participantCount: participants.length,
+			duration,
+			isActive: this.meeting.status === "Active",
+		};
 	}
 }

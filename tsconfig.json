@@ -1,38 +1,33 @@
 {
   "compilerOptions": {
-		// Environment setup & latest features
-		"lib": ["ES2024"],
-		"moduleDetection": "force",
-		"allowJs": true,
-		"baseUrl": ".",
-		"outDir": "./dist",
-		"moduleResolution": "bundler",
-
-		"paths": {
-			"@/*": ["src/box/*"],
-			"@box": ["src/box/index.ts"],
-			"game/*": ["factory-pattern/game/*"],
-			"@collaro/*": ["collaro/*"]
-		},
-
-		// Bundler mode
-		"module": "esnext",
-		"jsx": "react-jsx",
-		"target": "ES2020",
-		"noEmit": true,
-		"strict": true,
-		"skipLibCheck": true,
-		"esModuleInterop": true,
-		"resolveJsonModule": true,
-		"noFallthroughCasesInSwitch": true,
-		"noUncheckedIndexedAccess": true,
-		"noImplicitOverride": true,
-
-		// Some stricter flags (disabled by default)
-		"noUnusedLocals": false,
-		"noUnusedParameters": false,
-		"noPropertyAccessFromIndexSignature": false
-	},
-	"include": ["src/", "factory-pattern/", "collaro/"],
-	"exclude": ["node_modules/", "dist/"]
+    "lib": ["ES2024"],
+    "moduleDetection": "force",
+    "allowJs": true,
+    "outDir": "./dist",
+    "moduleResolution": "bundler",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": ["./src/box/*"],
+      "@box": ["./src/box/index.ts"],
+      "game/*": ["./factory-pattern/game/*"],
+      "@collaro/*": ["./collaro/*"]
+    },
+    "module": "esnext",
+    "jsx": "react-jsx",
+    "target": "ES2020",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "experimentalDecorators": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": ["src/", "factory-pattern/", "collaro/"],
+  "exclude": ["node_modules/", "dist/"]
 }

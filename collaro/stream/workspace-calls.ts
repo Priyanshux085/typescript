@@ -1,5 +1,5 @@
 import { GetOrCreateCallRequest } from "@stream-io/node-sdk";
-import { streamClient, secondStreamClient } from "./stream";
+import { streamClient } from "./stream";
 import {} from "@collaro/meeting";
 import { WorkspaceMeetingManager, WorkspaceMemberManager } from "@collaro/manager";
 import { User } from "@collaro/user";
@@ -114,7 +114,7 @@ const requests = await workspaceService.listRequests(steveWorkspace.id);
 const tonyMember = await workspaceService.approveJoinRequest(requests[0]!.id, steveWorkspace.ownerDetail.id);
 
 // Stream Client Upsert User for Tony
-await secondStreamClient.upsertUsers([{
+await streamClient.upsertUsers([{
   id: String(tonyMember.userId),
   name: tonyMember.name,
   custom: {

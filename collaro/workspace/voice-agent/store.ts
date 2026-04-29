@@ -2,8 +2,7 @@ import {
 	IVoiceAgentConfig,
 	IVoiceAgentStore,
 } from "./interface";
-import { TWorkspaceId } from "../interface";
-import { TVoiceAgentId } from "@collaro/utils";
+import { TVoiceAgentId, TWorkspaceId } from "@collaro/utils";
 
 /**
  * In-memory store for voice agent configurations

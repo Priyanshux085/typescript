@@ -6,15 +6,13 @@
 // ============================================
 // SERVER-SIDE EXPORTS (Node.js)
 // ============================================
-export { streamClient, secondStreamClient } from './stream'
+export { streamClient } from "./stream";
 export { config } from './env'
 
 // ============================================
 // CLIENT-SIDE EXPORTS (React/Browser)
 // ============================================
-export { createClientVideoConfig, type TClientStreamParams } from './stream'
-export { joinCall, leaveCall, useCallJoin, type CallJoinConfig } from './client-join-call'
-export { StreamProvider, DefaultCallLayout, MyApp } from './StreamProvider'
+export { createClientVideoConfig, type TClientStreamParams } from "./stream";
 
 /**
  * COMPLETE WORKFLOW

@@ -10,8 +10,8 @@ import {
 	ROLE_PERMISSION_GROUPS,
 	TPermission,
 	TPredefinedRoleKey,
-	TRoleId,
 } from "./interface";
+import { TRoleId } from "@collaro/utils";
 
 export class RoleValidator {
 	static canCreateCustomRole(subscription: TSubscriptionPlan, currentCustomRoleCount: number): IRoleValidationResult {

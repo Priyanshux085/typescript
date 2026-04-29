@@ -16,13 +16,12 @@ import {
 	ROLE_LIMITS_BY_SUBSCRIPTION,
 	TPermission,
 	TPredefinedRoleKey,
-	TRoleId,
 	IWorkspaceRoleManager,
 	IRoleAssignmentStore,
 	TCreateCustomRoleParams,
 } from "./interface";
 import { RoleValidator } from "./validator";
-import { ID } from "@collaro/utils";
+import { ID, TRoleId } from "@collaro/utils";
 import { MemoryRoleStore } from "./store";
 import { IMemberDTO, RoleAssignmentStore } from "./member";
 import { MemoryWorkspaceStore } from "../stores/memory-workspace-store";

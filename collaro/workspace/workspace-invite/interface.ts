@@ -1,8 +1,6 @@
 import { IWorkspaceDTO } from "../interface";
 import { IUserDTO } from "@collaro/user";
-import { TMemberId } from "@collaro/workspace/role/member";
-import { TRequestId } from "@collaro/workspace/member-request/interface";
-import { Input } from "@collaro/utils";
+import type { Input, TRequestId, TMemberId } from "@collaro/utils";
 
 export type TInviteId = TRequestId;
 export type TInviteStatus = "pending" | "accepted" | "revoked" | "expired";
